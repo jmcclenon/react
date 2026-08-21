@@ -144,9 +144,14 @@ html, body {
   transition: transform 0.2s, opacity 0.2s;
 }
 .seat-0 { bottom: -6px; left: 50%; transform: translateX(-50%); }   /* You */
-.seat-1 { left: -18px; top: 50%; transform: translateY(-50%); }     /* left */
+.seat-1 { left: 8px; top: 50%; transform: translateY(-50%); }       /* left */
 .seat-2 { top: -10px; left: 50%; transform: translateX(-50%); }     /* top */
-.seat-3 { right: -18px; top: 50%; transform: translateY(-50%); }    /* right */
+.seat-3 { right: 8px; top: 50%; transform: translateY(-50%); }      /* right */
+
+/* The side seats have limited width, so fan their 5 cards with a slight
+   overlap (rank corners stay visible) instead of overflowing the felt. */
+.seat-1 .cards-row .card + .card,
+.seat-3 .cards-row .card + .card { margin-left: -30px; }
 
 .seat.folded { opacity: 0.4; }
 .seat.active-turn .seat-info {
