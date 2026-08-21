@@ -1,0 +1,8 @@
+services:
+  poker:
+    build: .
+    image: five-card-stud-poker
+    container_name: five-card-stud-poker
+    ports:
+      - "8080:80"
+    restart: unless-stopped

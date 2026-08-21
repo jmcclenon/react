@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Five Card Stud Poker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <h1 class="title">♠ Five Card Stud ♦</h1>
+      <div class="bankroll-box">
+        <span class="bankroll-label">Bankroll</span>
+        <span id="bankroll" class="bankroll-value">$0</span>
+      </div>
+    </header>
+
+    <main class="game-area">
+      <div id="table" class="table"></div>
+
+      <div id="action-bar" class="action-bar"></div>
+
+      <div class="controls">
+        <button id="deal-btn" class="primary-btn">DEAL</button>
+        <button id="reset-btn" class="ghost-btn">Reset Bankroll</button>
+      </div>
+    </main>
+
+    <aside class="sidebar">
+      <h2>Table Log</h2>
+      <div id="log" class="log"></div>
+      <div class="rules">
+        <h3>How to play</h3>
+        <ol>
+          <li>Everyone antes. You get one hidden hole card and one up card.</li>
+          <li>Four betting rounds; a new up card is dealt before each of the
+              last three.</li>
+          <li>Fold, Check, Call, Bet or Raise on your turn.</li>
+          <li>Best five-card poker hand at showdown wins the pot.</li>
+        </ol>
+        <p class="stakes">Ante $5 · Small bet $10 · Big bet $20</p>
+      </div>
+    </aside>
+  </div>
+
+  <div id="broke-modal" class="modal">
+    <div class="modal-card">
+      <h2>You're out of chips!</h2>
+      <p>It's play money — grab another stack and keep going.</p>
+      <button id="rebuy-btn" class="primary-btn">Buy in for $1000</button>
+    </div>
+  </div>
+
+  <script src="js/handEvaluator.js"></script>
+  <script src="js/cards.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

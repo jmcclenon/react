@@ -1,0 +1,11 @@
+{
+  "name": "five-card-stud-poker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Browser-based five-card stud poker game with chips and AI opponents, served via Docker.",
+  "scripts": {
+    "test": "node test/run.js",
+    "start": "cd public && python3 -m http.server 8080"
+  },
+  "license": "MIT"
+}
