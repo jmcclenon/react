@@ -58,18 +58,22 @@ header.app-header {
   margin-left: auto;
 }
 
+:root {
+  --board-col: min(72vw, 560px);
+}
 .layout {
   display: grid;
-  grid-template-columns: minmax(280px, 340px) auto minmax(300px, 380px);
-  gap: 20px;
+  grid-template-columns: minmax(240px, 300px) var(--board-col) minmax(300px, 360px);
+  justify-content: center;
+  gap: 16px;
   padding: 20px;
   align-items: start;
-  max-width: 1400px;
   margin: 0 auto;
 }
-@media (max-width: 1080px) {
+@media (max-width: 1120px) {
   .layout {
     grid-template-columns: 1fr;
+    justify-content: stretch;
   }
 }
 
@@ -89,6 +93,64 @@ header.app-header {
 }
 .panel + .panel {
   margin-top: 18px;
+}
+
+/* ---------- Rating panel ---------- */
+.rating-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+.rating-value {
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.rating-record {
+  font-size: 13px;
+  color: var(--text);
+}
+.rating-record .rating-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.rated-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+.rated-badge.rated {
+  background: rgba(123, 200, 108, 0.16);
+  color: var(--good);
+  border: 1px solid rgba(123, 200, 108, 0.4);
+}
+.rated-badge.casual {
+  background: rgba(154, 161, 173, 0.14);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+.rating-hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.rating-delta {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.rating-delta.up {
+  color: var(--good);
+}
+.rating-delta.down {
+  color: var(--blunder);
 }
 
 /* ---------- Board ---------- */

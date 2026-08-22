@@ -50,7 +50,134 @@
     clockTimer: null,
     clockActive: null,
     lastTick: 0,
+    // rating
+    assistedThisGame: false, // coach/analysis/hint used → game is Casual (unrated)
+    resultApplied: false, // guard so a game updates the rating only once
   };
+
+  // Persistent player rating profile (Elo-style). Only "uncoached" games count.
+  var STARTING_RATING = 1000;
+  var RATING_KEY = 'chessCoach.rating.v1';
+  var profile = loadProfile();
+
+  function loadProfile() {
+    var def = {rating: STARTING_RATING, games: 0, wins: 0, losses: 0, draws: 0, rated: 0};
+    try {
+      var raw = localStorage.getItem(RATING_KEY);
+      if (raw) {
+        var p = JSON.parse(raw);
+        return {
+          rating: typeof p.rating === 'number' ? p.rating : STARTING_RATING,
+          games: p.games || 0,
+          wins: p.wins || 0,
+          losses: p.losses || 0,
+          draws: p.draws || 0,
+          rated: p.rated || 0,
+        };
+      }
+    } catch (e) {
+      /* localStorage unavailable (e.g. some file:// contexts) — use defaults */
+    }
+    return def;
+  }
+
+  function saveProfile() {
+    try {
+      localStorage.setItem(RATING_KEY, JSON.stringify(profile));
+    } catch (e) {
+      /* ignore persistence failures */
+    }
+  }
+
+  // A game counts toward the rating only if it was played without assistance:
+  // Coach mode off, Live analysis off, and no Hint used during the game.
+  function isRatedGame() {
+    return !state.assistedThisGame && !state.coachEnabled && !state.analysisEnabled;
+  }
+
+  // Flag the current game as assisted (Casual). Called when the player turns on
+  // the coach/analysis or asks for a hint.
+  function markAssisted() {
+    if (!state.assistedThisGame) {
+      state.assistedThisGame = true;
+      updateRatedBadge();
+    }
+  }
+
+  function expectedScore(playerElo, oppElo) {
+    return 1 / (1 + Math.pow(10, (oppElo - playerElo) / 400));
+  }
+
+  // Update the Rated/Casual badge to reflect the live game state.
+  function updateRatedBadge() {
+    var badge = $('ratedBadge');
+    if (isRatedGame()) {
+      badge.className = 'rated-badge rated';
+      badge.textContent = 'Rated game — vs ' + state.ai.level.name + ' (~' + state.ai.level.elo + ')';
+    } else {
+      badge.className = 'rated-badge casual';
+      var reason = state.coachEnabled
+        ? 'Coach on'
+        : state.analysisEnabled
+        ? 'Analysis on'
+        : state.assistedThisGame
+        ? 'Hint used'
+        : 'assisted';
+      badge.textContent = 'Casual game (' + reason + ') — rating unchanged';
+    }
+  }
+
+  function renderRating(deltaHtml) {
+    $('ratingValue').textContent = profile.rating;
+    var rec = profile.wins + 'W · ' + profile.losses + 'L · ' + profile.draws + 'D';
+    $('ratingRecord').textContent = rec + '  (' + profile.games + ' games)';
+    var sub = profile.rated < 10 ? 'Provisional — ' + profile.rated + ' rated games' : profile.rated + ' rated games';
+    $('ratingSub').innerHTML = deltaHtml ? sub + '  ' + deltaHtml : sub;
+    updateRatedBadge();
+  }
+
+  // Apply a finished game's result (from the human's perspective) to the rating
+  // profile. Runs at most once per game. Only uncoached games change the rating.
+  function applyGameResult(humanResult) {
+    if (state.resultApplied) return;
+    if (state.records.length === 0) return; // ignore games with no moves played
+    state.resultApplied = true;
+
+    profile.games++;
+    if (humanResult === 'win') profile.wins++;
+    else if (humanResult === 'loss') profile.losses++;
+    else profile.draws++;
+
+    if (isRatedGame()) {
+      var oppElo = state.ai.level.elo;
+      var actual = humanResult === 'win' ? 1 : humanResult === 'draw' ? 0.5 : 0;
+      var expected = expectedScore(profile.rating, oppElo);
+      var k = profile.rated < 10 ? 40 : 24; // faster convergence while provisional
+      var delta = Math.round(k * (actual - expected));
+      profile.rating += delta;
+      profile.rated++;
+      saveProfile();
+      var cls = delta >= 0 ? 'up' : 'down';
+      var sign = delta >= 0 ? '+' : '';
+      var deltaHtml = '<span class="rating-delta ' + cls + '">' + sign + delta + '</span>';
+      renderRating(deltaHtml);
+      addCoachMessage(
+        delta >= 0 ? 'good' : 'warn',
+        'Rating updated',
+        'Rated game vs ' + state.ai.level.name + ' (~' + oppElo + '): ' + sign + delta +
+          ' → your rating is now ' + profile.rating + '.'
+      );
+    } else {
+      saveProfile();
+      renderRating();
+    }
+  }
+
+  function resetRating() {
+    profile = {rating: STARTING_RATING, games: 0, wins: 0, losses: 0, draws: 0, rated: 0};
+    saveProfile();
+    renderRating();
+  }
 
   // ---- DOM refs ---------------------------------------------------------
   var $ = function (id) {
@@ -65,6 +192,7 @@
     populateLevels();
     buildBoardCells();
     bindControls();
+    renderRating();
     newGame();
   }
 
@@ -118,6 +246,7 @@
     $('level').addEventListener('change', function () {
       state.ai.setLevel(parseInt(this.value, 10));
       updateLevelMeta();
+      updateRatedBadge();
     });
     $('side').addEventListener('change', function () {});
     $('clockEnabled').addEventListener('change', function () {
@@ -125,20 +254,28 @@
     });
     $('coachEnabled').addEventListener('change', function () {
       state.coachEnabled = this.checked;
+      if (this.checked) markAssisted(); // enabling coaching makes the game Casual
       renderCoach();
+      updateRatedBadge();
     });
     $('analysisEnabled').addEventListener('change', function () {
       state.analysisEnabled = this.checked;
-      if (state.analysisEnabled) runAnalysis();
-      else {
+      if (state.analysisEnabled) {
+        markAssisted(); // enabling analysis makes the game Casual
+        runAnalysis();
+      } else {
         $('analysisStatus').classList.remove('hidden');
         $('analysisLines').innerHTML = '';
         setEvalBar(0, false);
       }
+      updateRatedBadge();
     });
     $('showHints').addEventListener('change', function () {
       state.showHints = this.checked;
       render();
+    });
+    $('resetRating').addEventListener('click', function () {
+      resetRating();
     });
     $('undoMove').addEventListener('click', undoMove);
     $('copyPgn').addEventListener('click', copyPgn);
@@ -170,6 +307,8 @@
     state.aiThinking = false;
     state.lastEvalWhite = 0;
     state.preMoveAnalysis = null;
+    state.assistedThisGame = false;
+    state.resultApplied = false;
     coachLog.length = 0;
 
     state.clockEnabled = $('clockEnabled').checked;
@@ -186,6 +325,7 @@
     setStatus('');
     render();
     renderCoach();
+    renderRating();
     runAnalysis();
 
     if (state.clockEnabled) startClock('w');
@@ -208,6 +348,7 @@
     stopClock();
     setStatus('You resigned. ' + (state.humanColor === 'w' ? 'Black' : 'White') + ' wins.');
     addCoachMessage('warn', 'Game over', 'You resigned. Review the moves with the arrows below to see where it went wrong — then start a new game and try again!');
+    applyGameResult('loss');
   }
 
   // ---- Rendering --------------------------------------------------------
@@ -503,6 +644,7 @@
       setStatus('Checkmate — ' + winner + ' wins!');
       var humanWon = (winner === 'White' && state.humanColor === 'w') || (winner === 'Black' && state.humanColor === 'b');
       addCoachMessage(humanWon ? 'good' : 'warn', 'Checkmate', humanWon ? 'Beautifully finished! You delivered checkmate.' : 'Checkmate. Study the final moves with the navigation arrows to see the mating pattern.');
+      applyGameResult(humanWon ? 'win' : 'loss');
       return true;
     }
     if (g.isStalemate()) {
@@ -510,18 +652,21 @@
       stopClock();
       setStatus('Stalemate — draw.');
       addCoachMessage('warn', 'Stalemate', 'The side to move has no legal moves but is not in check — it\'s a draw. Watch for this when you\'re far ahead!');
+      applyGameResult('draw');
       return true;
     }
     if (g.isInsufficientMaterial()) {
       state.gameOver = true;
       stopClock();
       setStatus('Draw — insufficient material.');
+      applyGameResult('draw');
       return true;
     }
     if (g.halfmoves >= 100) {
       state.gameOver = true;
       stopClock();
       setStatus('Draw — 50-move rule.');
+      applyGameResult('draw');
       return true;
     }
     return false;
@@ -741,6 +886,7 @@
     if (state.game.turn !== state.humanColor) return;
     var res = state.preMoveAnalysis || state.ai.analyze(state.game, 3);
     if (res && res.bestMove) {
+      markAssisted(); // using a hint makes the game Casual (unrated)
       state.hint = {from: res.bestMove.from, to: res.bestMove.to};
       var probe = new Chess(state.game.fen());
       var san = probe.toSan(res.bestMove);
@@ -887,6 +1033,7 @@
       var flagged = state.clockActive;
       var winner = flagged === 'w' ? 'Black' : 'White';
       setStatus('Time! ' + winner + ' wins on the clock.');
+      applyGameResult(flagged === state.humanColor ? 'loss' : 'win');
     }
     renderClocks();
   }

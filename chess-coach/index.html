@@ -23,6 +23,23 @@
     <div class="layout">
       <!-- LEFT: settings & controls -->
       <aside>
+        <section class="panel rating-panel">
+          <h2>Your Rating</h2>
+          <div class="rating-top">
+            <div class="rating-value" id="ratingValue">1000</div>
+            <div class="rating-record">
+              <div id="ratingRecord">Unrated · 0 games</div>
+              <div class="rating-sub" id="ratingSub">Provisional</div>
+            </div>
+          </div>
+          <div class="rated-badge" id="ratedBadge">Rated game</div>
+          <div class="rating-hint" id="ratingHint">
+            Your rating only changes in <strong>uncoached</strong> games — Coach
+            and Live analysis off, and no hints used.
+          </div>
+          <button class="btn" id="resetRating">Reset rating</button>
+        </section>
+
         <section class="panel">
           <h2>Game Setup</h2>
           <label class="field" for="level">Opponent strength</label>
@@ -127,26 +144,8 @@
         <div class="status-line" id="status"></div>
       </main>
 
-      <!-- RIGHT: coach + history -->
+      <!-- RIGHT: analysis, history & coach (kept beside the board) -->
       <aside>
-        <section class="panel">
-          <h2>Coach</h2>
-          <div id="coachPanel">
-            <div class="opening-name" id="openingName">Starting position</div>
-            <div id="coachMessages"></div>
-          </div>
-        </section>
-
-        <section class="panel">
-          <h2>Analysis</h2>
-          <div id="analysisPanel">
-            <div class="status-line" id="analysisStatus" style="text-align:left;font-weight:400;color:var(--muted)">
-              Enable live analysis to see the evaluation and best moves.
-            </div>
-            <div id="analysisLines"></div>
-          </div>
-        </section>
-
         <section class="panel">
           <h2>Move History</h2>
           <div class="moves" id="movesWrap">
@@ -163,6 +162,24 @@
           <div class="control-row" style="margin-top: 8px">
             <button class="btn" id="undoMove">Undo Move</button>
             <button class="btn" id="copyPgn">Copy PGN</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Analysis</h2>
+          <div id="analysisPanel">
+            <div class="status-line" id="analysisStatus" style="text-align:left;font-weight:400;color:var(--muted)">
+              Enable live analysis to see the evaluation and best moves.
+            </div>
+            <div id="analysisLines"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Coach</h2>
+          <div id="coachPanel">
+            <div class="opening-name" id="openingName">Starting position</div>
+            <div id="coachMessages"></div>
           </div>
         </section>
       </aside>
