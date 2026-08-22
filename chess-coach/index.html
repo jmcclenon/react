@@ -37,13 +37,17 @@
             Your rating only changes in <strong>uncoached</strong> games — Coach
             and Live analysis off, and no hints used.
           </div>
+          <div class="rating-chart-wrap">
+            <div class="rating-chart-title">Rating history</div>
+            <div id="ratingChart" class="rating-chart"></div>
+          </div>
           <button class="btn" id="resetRating">Reset rating</button>
         </section>
 
         <section class="panel">
           <h2>Game Setup</h2>
-          <label class="field" for="level">Opponent strength</label>
-          <select id="level"></select>
+          <label class="field" for="opponent">Opponent</label>
+          <select id="opponent"></select>
           <div class="level-meta" id="levelMeta"></div>
 
           <label class="field" for="side">Play as</label>
@@ -59,6 +63,35 @@
           <div class="control-row">
             <button class="btn" id="flipBoard">Flip Board</button>
             <button class="btn" id="hintBtn">Hint</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Tournament</h2>
+          <label class="field" for="matchFormat">Match format</label>
+          <select id="matchFormat">
+            <option value="1">Single game</option>
+            <option value="3">Best of 3 (first to 2)</option>
+            <option value="5">Best of 5 (first to 3)</option>
+            <option value="7">Best of 7 (first to 4)</option>
+          </select>
+          <p class="rating-hint" style="margin-top:8px">
+            Start a match with <strong>New Game</strong>. Colors alternate each
+            game; win the required points to take the match.
+          </p>
+          <div id="matchStatus" class="match-status hidden">
+            <div class="match-line">
+              <span id="matchLabel">Best of 3</span>
+              <span class="match-score">
+                <span id="matchYou">You 0</span> ·
+                <span id="matchOpp">Opp 0</span>
+              </span>
+            </div>
+            <div class="match-dots" id="matchDots"></div>
+            <div class="match-result" id="matchResult"></div>
+            <button class="btn primary hidden" id="nextGame" style="margin-top:8px">
+              Next game
+            </button>
           </div>
         </section>
 
@@ -162,6 +195,17 @@
           <div class="control-row" style="margin-top: 8px">
             <button class="btn" id="undoMove">Undo Move</button>
             <button class="btn" id="copyPgn">Copy PGN</button>
+          </div>
+          <div class="control-row">
+            <button class="btn" id="saveGame">Save Game</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Saved Games</h2>
+          <div id="savedGamesList" class="saved-games">
+            <div class="saved-empty">No saved games yet. Finished games are
+              saved automatically, or use <strong>Save Game</strong>.</div>
           </div>
         </section>
 

@@ -28,7 +28,6 @@
     viewPly: 0, // which position index is being viewed
     positions: [], // fen after each ply; positions[0] = start
     records: [], // move records with quality metadata
-    ai: new ChessAI(ChessAI.LEVELS[0]),
     coach: new ChessCoach(),
     aiThinking: false,
     gameOver: false,
@@ -53,6 +52,13 @@
     // rating
     assistedThisGame: false, // coach/analysis/hint used → game is Casual (unrated)
     resultApplied: false, // guard so a game updates the rating only once
+    // opponent / analysis engines
+    ai: new ChessAI(), // the opponent (carries a persona + style)
+    analyzer: new ChessAI(), // objective engine for eval bar / hints / grading
+    // tournament
+    match: null, // {format, needWins, games:[], you, opp, gameNo, persona, humanColorGame1, over, matchWinner}
+    // replay
+    reviewMode: false, // true when viewing a loaded/saved game (no live play)
   };
 
   // Persistent player rating profile (Elo-style). Only "uncoached" games count.
@@ -61,7 +67,7 @@
   var profile = loadProfile();
 
   function loadProfile() {
-    var def = {rating: STARTING_RATING, games: 0, wins: 0, losses: 0, draws: 0, rated: 0};
+    var def = {rating: STARTING_RATING, games: 0, wins: 0, losses: 0, draws: 0, rated: 0, history: []};
     try {
       var raw = localStorage.getItem(RATING_KEY);
       if (raw) {
@@ -73,6 +79,7 @@
           losses: p.losses || 0,
           draws: p.draws || 0,
           rated: p.rated || 0,
+          history: Array.isArray(p.history) ? p.history : [],
         };
       }
     } catch (e) {
@@ -86,6 +93,32 @@
       localStorage.setItem(RATING_KEY, JSON.stringify(profile));
     } catch (e) {
       /* ignore persistence failures */
+    }
+  }
+
+  // Persistent store of finished/saved games (PGN + metadata) for replay.
+  var GAMES_KEY = 'chessCoach.games.v1';
+  var MAX_SAVED_GAMES = 60;
+  var savedGames = loadGames();
+
+  function loadGames() {
+    try {
+      var raw = localStorage.getItem(GAMES_KEY);
+      if (raw) {
+        var arr = JSON.parse(raw);
+        if (Array.isArray(arr)) return arr;
+      }
+    } catch (e) {
+      /* ignore */
+    }
+    return [];
+  }
+
+  function persistGames() {
+    try {
+      localStorage.setItem(GAMES_KEY, JSON.stringify(savedGames.slice(0, MAX_SAVED_GAMES)));
+    } catch (e) {
+      /* ignore */
     }
   }
 
@@ -111,9 +144,14 @@
   // Update the Rated/Casual badge to reflect the live game state.
   function updateRatedBadge() {
     var badge = $('ratedBadge');
+    if (state.reviewMode) {
+      badge.className = 'rated-badge casual';
+      badge.textContent = 'Reviewing a saved game';
+      return;
+    }
     if (isRatedGame()) {
       badge.className = 'rated-badge rated';
-      badge.textContent = 'Rated game — vs ' + state.ai.level.name + ' (~' + state.ai.level.elo + ')';
+      badge.textContent = 'Rated game — vs ' + aiName() + ' (~' + state.ai.level.elo + ')';
     } else {
       badge.className = 'rated-badge casual';
       var reason = state.coachEnabled
@@ -134,6 +172,98 @@
     var sub = profile.rated < 10 ? 'Provisional — ' + profile.rated + ' rated games' : profile.rated + ' rated games';
     $('ratingSub').innerHTML = deltaHtml ? sub + '  ' + deltaHtml : sub;
     updateRatedBadge();
+    renderRatingChart();
+  }
+
+  // A compact single-series rating-over-time line chart, drawn as inline SVG so
+  // it inherits the app's theme tokens. Starts from the baseline rating and
+  // plots the rating after each rated game; hovering shows that game's detail.
+  function renderRatingChart() {
+    var host = $('ratingChart');
+    if (!host) return;
+    var ratings = [STARTING_RATING];
+    profile.history.forEach(function (h) { ratings.push(h.r); });
+
+    if (ratings.length < 2) {
+      host.innerHTML = '<div class="chart-empty">Play a rated game (Coach &amp; Analysis off) to start tracking your rating.</div>';
+      return;
+    }
+
+    var W = Math.max(180, host.clientWidth || 240);
+    var H = 110;
+    var padL = 30, padR = 8, padT = 10, padB = 16;
+    var plotW = W - padL - padR;
+    var plotH = H - padT - padB;
+
+    var min = Math.min.apply(null, ratings);
+    var max = Math.max.apply(null, ratings);
+    if (max - min < 40) { var mid = (max + min) / 2; min = mid - 20; max = mid + 20; }
+    var pad = (max - min) * 0.12;
+    min -= pad; max += pad;
+
+    var n = ratings.length;
+    function xAt(i) { return padL + (n === 1 ? 0 : (i / (n - 1)) * plotW); }
+    function yAt(v) { return padT + (1 - (v - min) / (max - min)) * plotH; }
+
+    var accent = getVar('--accent') || '#7ca5ff';
+    var muted = getVar('--muted') || '#9aa1ad';
+    var border = getVar('--border') || '#3a3f49';
+
+    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" role="img" aria-label="Rating history line chart">';
+    // gridlines: min, mid, max
+    [min, (min + max) / 2, max].forEach(function (gv) {
+      var y = yAt(gv);
+      svg += '<line x1="' + padL + '" y1="' + y.toFixed(1) + '" x2="' + (W - padR) + '" y2="' + y.toFixed(1) + '" stroke="' + border + '" stroke-width="1" opacity="0.5"/>';
+      svg += '<text x="' + (padL - 5) + '" y="' + (y + 3).toFixed(1) + '" text-anchor="end" font-size="9" fill="' + muted + '">' + Math.round(gv) + '</text>';
+    });
+    // area + line path
+    var d = '', area = 'M ' + xAt(0).toFixed(1) + ' ' + yAt(ratings[0]).toFixed(1);
+    ratings.forEach(function (v, i) {
+      var cmd = (i === 0 ? 'M' : 'L') + ' ' + xAt(i).toFixed(1) + ' ' + yAt(v).toFixed(1);
+      d += (i === 0 ? '' : ' ') + cmd;
+      if (i > 0) area += ' L ' + xAt(i).toFixed(1) + ' ' + yAt(v).toFixed(1);
+    });
+    area += ' L ' + xAt(n - 1).toFixed(1) + ' ' + (padT + plotH).toFixed(1) + ' L ' + xAt(0).toFixed(1) + ' ' + (padT + plotH).toFixed(1) + ' Z';
+    svg += '<path d="' + area + '" fill="' + accent + '" opacity="0.12"/>';
+    svg += '<path d="' + d + '" fill="none" stroke="' + accent + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+    // emphasized endpoint
+    svg += '<circle cx="' + xAt(n - 1).toFixed(1) + '" cy="' + yAt(ratings[n - 1]).toFixed(1) + '" r="3.5" fill="' + accent + '"/>';
+    // invisible hover targets
+    ratings.forEach(function (v, i) {
+      svg += '<circle class="rc-pt" data-i="' + i + '" cx="' + xAt(i).toFixed(1) + '" cy="' + yAt(v).toFixed(1) + '" r="8" fill="transparent"/>';
+    });
+    svg += '</svg>';
+
+    host.innerHTML = svg + '<div class="rc-tooltip" id="rcTip"></div>';
+
+    // hover tooltip
+    var pts = host.querySelectorAll('.rc-pt');
+    var tip = $('rcTip');
+    pts.forEach(function (pt) {
+      pt.addEventListener('mouseenter', function () {
+        var i = parseInt(pt.getAttribute('data-i'), 10);
+        var scaleX = host.clientWidth / W;
+        var cx = parseFloat(pt.getAttribute('cx')) * scaleX;
+        var cy = parseFloat(pt.getAttribute('cy')) * (110 / H);
+        var txt;
+        if (i === 0) {
+          txt = 'Start · ' + ratings[0];
+        } else {
+          var h = profile.history[i - 1];
+          var resWord = h.res === 'win' ? 'W' : h.res === 'loss' ? 'L' : 'D';
+          txt = 'Game ' + i + ' · ' + h.r + ' (' + resWord + ' vs ' + h.opp + ')';
+        }
+        tip.textContent = txt;
+        tip.style.left = cx + 'px';
+        tip.style.top = cy + 'px';
+        tip.style.opacity = '1';
+      });
+      pt.addEventListener('mouseleave', function () { tip.style.opacity = '0'; });
+    });
+  }
+
+  function getVar(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   }
 
   // Apply a finished game's result (from the human's perspective) to the rating
@@ -156,6 +286,8 @@
       var delta = Math.round(k * (actual - expected));
       profile.rating += delta;
       profile.rated++;
+      profile.history.push({r: profile.rating, t: Date.now(), opp: aiName(), oppElo: oppElo, res: humanResult});
+      if (profile.history.length > 200) profile.history.shift();
       saveProfile();
       var cls = delta >= 0 ? 'up' : 'down';
       var sign = delta >= 0 ? '+' : '';
@@ -164,17 +296,23 @@
       addCoachMessage(
         delta >= 0 ? 'good' : 'warn',
         'Rating updated',
-        'Rated game vs ' + state.ai.level.name + ' (~' + oppElo + '): ' + sign + delta +
+        'Rated game vs ' + aiName() + ' (~' + oppElo + '): ' + sign + delta +
           ' → your rating is now ' + profile.rating + '.'
       );
     } else {
       saveProfile();
       renderRating();
     }
+
+    // Auto-save the finished game for later replay.
+    autoSaveFinishedGame(humanResult);
+
+    // Advance the tournament match, if one is in progress.
+    if (state.match && !state.match.over) recordMatchResult(humanResult);
   }
 
   function resetRating() {
-    profile = {rating: STARTING_RATING, games: 0, wins: 0, losses: 0, draws: 0, rated: 0};
+    profile = {rating: STARTING_RATING, games: 0, wins: 0, losses: 0, draws: 0, rated: 0, history: []};
     saveProfile();
     renderRating();
   }
@@ -189,36 +327,60 @@
 
   // ---- Init -------------------------------------------------------------
   function init() {
-    populateLevels();
+    populateOpponents();
     buildBoardCells();
     bindControls();
     renderRating();
+    renderSavedGames();
     newGame();
   }
 
-  function populateLevels() {
-    var sel = $('level');
-    ChessAI.LEVELS.forEach(function (lvl, i) {
-      var opt = document.createElement('option');
-      opt.value = i;
-      opt.textContent = lvl.name + '  (~' + lvl.elo + ')';
-      sel.appendChild(opt);
+  // Build the opponent picker, grouped into one <optgroup> per ELO band, each
+  // listing the named personalities (styles) available at that strength.
+  function populateOpponents() {
+    var sel = $('opponent');
+    sel.innerHTML = '';
+    ChessAI.LEVELS.forEach(function (lvl, li) {
+      var group = document.createElement('optgroup');
+      group.label = lvl.name + '  (~' + lvl.elo + ')';
+      ChessAI.ROSTER.forEach(function (persona, pi) {
+        if (persona.level !== li) return;
+        var opt = document.createElement('option');
+        opt.value = pi;
+        var style = ChessAI.STYLES[persona.style];
+        opt.textContent = persona.name + ' — ' + style.label;
+        group.appendChild(opt);
+      });
+      sel.appendChild(group);
     });
     sel.value = 0;
+    state.ai.setPersona(ChessAI.ROSTER[0]);
     updateLevelMeta();
+  }
+
+  function currentPersonaIndex() {
+    return parseInt($('opponent').value, 10) || 0;
   }
 
   function updateLevelMeta() {
     var lvl = state.ai.level;
-    var desc = {
-      Beginner: 'Plays quickly and makes frequent mistakes — great for learning the ropes.',
-      Casual: 'Thinks a little, still blunders sometimes.',
-      Intermediate: 'Solid tactics, looks a couple of moves ahead.',
-      Advanced: 'Rarely blunders; punishes loose play.',
-      Expert: 'Deep, accurate calculation.',
-      Grandmaster: 'Maximum search depth with quiescence — expect a serious fight.',
+    var style = state.ai.style || ChessAI.STYLES.balanced;
+    var strength = {
+      Beginner: 'plays fast and blunders often',
+      Casual: 'thinks a little, still slips up',
+      Intermediate: 'solid tactics, a few moves deep',
+      Advanced: 'rarely blunders',
+      Expert: 'deep, accurate calculation',
+      Grandmaster: 'maximum depth — a serious fight',
     };
-    $('levelMeta').textContent = desc[lvl.name] || '';
+    $('levelMeta').innerHTML =
+      '<strong>' + (state.ai.displayName || lvl.name) + '</strong> · ~' + lvl.elo +
+      ' · ' + style.label + '<br>' + style.blurb + ' (' + (strength[lvl.name] || '') + ')';
+  }
+
+  // Display name for the current opponent (persona name, else level name).
+  function aiName() {
+    return state.ai.displayName || state.ai.level.name;
   }
 
   // Build 64 square cells once; we update contents on render.
@@ -243,8 +405,8 @@
       render();
     });
     $('hintBtn').addEventListener('click', showHint);
-    $('level').addEventListener('change', function () {
-      state.ai.setLevel(parseInt(this.value, 10));
+    $('opponent').addEventListener('change', function () {
+      state.ai.setPersona(ChessAI.ROSTER[currentPersonaIndex()]);
       updateLevelMeta();
       updateRatedBadge();
     });
@@ -277,8 +439,11 @@
     $('resetRating').addEventListener('click', function () {
       resetRating();
     });
+    $('nextGame').addEventListener('click', startNextMatchGame);
+    $('saveGame').addEventListener('click', saveCurrentGame);
     $('undoMove').addEventListener('click', undoMove);
     $('copyPgn').addEventListener('click', copyPgn);
+    window.addEventListener('resize', debounce(renderRatingChart, 200));
     $('navStart').addEventListener('click', function () { navTo(0); });
     $('navPrev').addEventListener('click', function () { navTo(state.viewPly - 1); });
     $('navNext').addEventListener('click', function () { navTo(state.viewPly + 1); });
@@ -290,11 +455,40 @@
   }
 
   // ---- New game ---------------------------------------------------------
+  // Read the setup form, configure the opponent and (optionally) a match, then
+  // begin the first game.
   function newGame() {
+    exitReview(true); // leaving any saved-game review
+    state.ai.setPersona(ChessAI.ROSTER[currentPersonaIndex()]);
+    updateLevelMeta();
+
+    // Persist the game-wide settings (they carry across a match's games).
+    state.clockEnabled = $('clockEnabled').checked;
+    state.baseMinutes = clampNum($('clockMinutes').value, 1, 180, 10);
+    state.increment = clampNum($('clockIncrement').value, 0, 60, 0);
+    state.coachEnabled = $('coachEnabled').checked;
+    state.analysisEnabled = $('analysisEnabled').checked;
+    state.showHints = $('showHints').checked;
+
+    var format = parseInt($('matchFormat').value, 10) || 1;
+    var chosenColor = $('side').value;
+    if (format > 1) {
+      setupMatch(format, chosenColor);
+    } else {
+      state.match = null;
+    }
+    renderMatch();
+
+    beginGame(chosenColor);
+  }
+
+  // Reset the board and start a single game with the human on `humanColor`.
+  // Assumes the opponent persona and game settings are already configured.
+  function beginGame(humanColor) {
     stopClock();
-    state.humanColor = $('side').value;
-    state.orientation = state.humanColor;
-    state.ai.setLevel(parseInt($('level').value, 10));
+    state.reviewMode = false;
+    state.humanColor = humanColor;
+    state.orientation = humanColor;
     state.game = new Chess();
     state.positions = [state.game.fen()];
     state.records = [];
@@ -311,18 +505,13 @@
     state.resultApplied = false;
     coachLog.length = 0;
 
-    state.clockEnabled = $('clockEnabled').checked;
-    state.baseMinutes = clampNum($('clockMinutes').value, 1, 180, 10);
-    state.increment = clampNum($('clockIncrement').value, 0, 60, 0);
     state.clockMs = {
       w: state.baseMinutes * 60000,
       b: state.baseMinutes * 60000,
     };
-    state.coachEnabled = $('coachEnabled').checked;
-    state.analysisEnabled = $('analysisEnabled').checked;
-    state.showHints = $('showHints').checked;
 
     setStatus('');
+    renderReviewBanner();
     render();
     renderCoach();
     renderRating();
@@ -342,13 +531,286 @@
     return Math.max(lo, Math.min(hi, v));
   }
 
+  function debounce(fn, ms) {
+    var t;
+    return function () {
+      clearTimeout(t);
+      t = setTimeout(fn, ms);
+    };
+  }
+
   function resign() {
-    if (state.gameOver) return;
+    if (state.gameOver || state.reviewMode) return;
     state.gameOver = true;
     stopClock();
     setStatus('You resigned. ' + (state.humanColor === 'w' ? 'Black' : 'White') + ' wins.');
     addCoachMessage('warn', 'Game over', 'You resigned. Review the moves with the arrows below to see where it went wrong — then start a new game and try again!');
     applyGameResult('loss');
+  }
+
+  // ---- Tournament / match ----------------------------------------------
+  function setupMatch(format, humanColorGame1) {
+    state.match = {
+      format: format,
+      needWins: Math.floor(format / 2) + 1,
+      games: [], // {res:'win'|'loss'|'draw'} per game
+      you: 0, // points (win 1, draw 0.5)
+      opp: 0,
+      gameNo: 1,
+      persona: state.ai.persona,
+      humanColorGame1: humanColorGame1,
+      over: false,
+      matchWinner: null,
+    };
+  }
+
+  // Record a finished game's result into the active match and either declare a
+  // match winner or offer the next game.
+  function recordMatchResult(humanResult) {
+    var m = state.match;
+    m.games.push({res: humanResult});
+    if (humanResult === 'win') m.you += 1;
+    else if (humanResult === 'loss') m.opp += 1;
+    else { m.you += 0.5; m.opp += 0.5; }
+
+    if (m.you >= m.needWins || m.opp >= m.needWins) {
+      m.over = true;
+      m.matchWinner = m.you > m.opp ? 'you' : m.opp > m.you ? 'opp' : 'tie';
+      var msg = m.matchWinner === 'you'
+        ? 'You won the match ' + fmtScore(m.you) + '–' + fmtScore(m.opp) + '! 🏆'
+        : m.matchWinner === 'opp'
+        ? 'You lost the match ' + fmtScore(m.you) + '–' + fmtScore(m.opp) + '.'
+        : 'The match ended tied ' + fmtScore(m.you) + '–' + fmtScore(m.opp) + '.';
+      addCoachMessage(m.matchWinner === 'you' ? 'good' : 'warn', 'Match over', msg);
+    }
+    renderMatch();
+  }
+
+  function startNextMatchGame() {
+    var m = state.match;
+    if (!m || m.over) return;
+    m.gameNo += 1;
+    // Alternate colors each game for fairness.
+    var color = m.gameNo % 2 === 1 ? m.humanColorGame1 : (m.humanColorGame1 === 'w' ? 'b' : 'w');
+    renderMatch();
+    beginGame(color);
+  }
+
+  function fmtScore(x) {
+    return Number.isInteger(x) ? String(x) : x.toFixed(1);
+  }
+
+  function renderMatch() {
+    var box = $('matchStatus');
+    var m = state.match;
+    if (!m) {
+      box.classList.add('hidden');
+      return;
+    }
+    box.classList.remove('hidden');
+    $('matchLabel').textContent = 'Best of ' + m.format + (m.persona ? ' · ' + m.persona.name : '');
+    $('matchYou').textContent = 'You ' + fmtScore(m.you);
+    $('matchOpp').textContent = aiName() + ' ' + fmtScore(m.opp);
+
+    var dots = $('matchDots');
+    dots.innerHTML = '';
+    for (var i = 0; i < m.format; i++) {
+      var d = document.createElement('span');
+      d.className = 'match-dot';
+      var g = m.games[i];
+      if (g) {
+        d.classList.add(g.res);
+        d.textContent = g.res === 'win' ? 'W' : g.res === 'loss' ? 'L' : '½';
+      } else {
+        d.textContent = i + 1;
+      }
+      dots.appendChild(d);
+    }
+
+    var resultEl = $('matchResult');
+    var nextBtn = $('nextGame');
+    if (m.over) {
+      resultEl.className = 'match-result ' + (m.matchWinner === 'you' ? 'win' : m.matchWinner === 'opp' ? 'loss' : '');
+      resultEl.textContent = m.matchWinner === 'you' ? 'Match won 🏆' : m.matchWinner === 'opp' ? 'Match lost' : 'Match tied';
+      nextBtn.classList.add('hidden');
+    } else {
+      resultEl.textContent = 'Game ' + m.gameNo + ' of up to ' + m.format;
+      resultEl.className = 'match-result';
+      // Offer "Next game" only once the current game has finished.
+      nextBtn.classList.toggle('hidden', !(state.gameOver && !m.over));
+    }
+  }
+
+  // ---- Saved games (save / reload / replay) -----------------------------
+  function serializeCurrentGame(humanResult) {
+    var sans = state.records.map(function (r) { return r.san; });
+    return {
+      id: 'g' + Date.now() + Math.floor(Math.random() * 1000),
+      date: Date.now(),
+      opponent: aiName(),
+      oppElo: state.ai.level.elo,
+      style: state.ai.style ? state.ai.style.label : '',
+      humanColor: state.humanColor,
+      result: humanResult || 'unfinished',
+      rated: isRatedGame(),
+      status: statusEl.textContent,
+      sans: sans,
+    };
+  }
+
+  function autoSaveFinishedGame(humanResult) {
+    if (state.records.length === 0) return;
+    savedGames.unshift(serializeCurrentGame(humanResult));
+    if (savedGames.length > MAX_SAVED_GAMES) savedGames.length = MAX_SAVED_GAMES;
+    persistGames();
+    renderSavedGames();
+  }
+
+  function saveCurrentGame() {
+    if (state.reviewMode) return;
+    if (state.records.length === 0) {
+      setStatus('Nothing to save yet — play a move first.');
+      return;
+    }
+    var humanResult = state.gameOver ? inferHumanResult() : null;
+    savedGames.unshift(serializeCurrentGame(humanResult));
+    if (savedGames.length > MAX_SAVED_GAMES) savedGames.length = MAX_SAVED_GAMES;
+    persistGames();
+    renderSavedGames();
+    setStatus('Game saved. Find it under Saved Games.');
+  }
+
+  function inferHumanResult() {
+    var g = state.game;
+    if (g.isCheckmate()) {
+      var winner = g.turn === 'w' ? 'b' : 'w';
+      return winner === state.humanColor ? 'win' : 'loss';
+    }
+    if (g.isStalemate() || g.isDraw()) return 'draw';
+    return 'unfinished';
+  }
+
+  function renderSavedGames() {
+    var host = $('savedGamesList');
+    if (savedGames.length === 0) {
+      host.innerHTML = '<div class="saved-empty">No saved games yet. Finished games are saved automatically, or use <strong>Save Game</strong>.</div>';
+      return;
+    }
+    host.innerHTML = '';
+    savedGames.forEach(function (game) {
+      var card = document.createElement('div');
+      card.className = 'saved-game';
+
+      var top = document.createElement('div');
+      top.className = 'sg-top';
+      var title = document.createElement('span');
+      title.className = 'sg-title';
+      title.textContent = 'vs ' + game.opponent;
+      var res = document.createElement('span');
+      var rk = game.result === 'win' ? 'win' : game.result === 'loss' ? 'loss' : game.result === 'draw' ? 'draw' : '';
+      res.className = 'sg-result ' + rk;
+      res.textContent = game.result === 'win' ? 'Win' : game.result === 'loss' ? 'Loss' : game.result === 'draw' ? 'Draw' : '—';
+      top.appendChild(title);
+      top.appendChild(res);
+
+      var meta = document.createElement('div');
+      meta.className = 'sg-meta';
+      var d = new Date(game.date);
+      meta.textContent = (game.rated ? 'Rated · ' : 'Casual · ') + game.sans.length + ' plies · ' +
+        d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+
+      var actions = document.createElement('div');
+      actions.className = 'sg-actions';
+      var replay = document.createElement('button');
+      replay.className = 'btn';
+      replay.textContent = 'Replay';
+      replay.addEventListener('click', function () { loadSavedGame(game.id); });
+      var del = document.createElement('button');
+      del.className = 'btn danger';
+      del.textContent = 'Delete';
+      del.addEventListener('click', function () { deleteSavedGame(game.id); });
+      actions.appendChild(replay);
+      actions.appendChild(del);
+
+      card.appendChild(top);
+      card.appendChild(meta);
+      card.appendChild(actions);
+      host.appendChild(card);
+    });
+  }
+
+  function deleteSavedGame(id) {
+    savedGames = savedGames.filter(function (g) { return g.id !== id; });
+    persistGames();
+    renderSavedGames();
+  }
+
+  // Rebuild a saved game and enter read-only review mode (step through moves).
+  function loadSavedGame(id) {
+    var game = savedGames.find(function (g) { return g.id === id; });
+    if (!game) return;
+    stopClock();
+    var g = new Chess();
+    var positions = [g.fen()];
+    var records = [];
+    for (var i = 0; i < game.sans.length; i++) {
+      var r = g.move(game.sans[i]);
+      if (!r) break; // corrupt entry — stop where it fails
+      records.push(r);
+      positions.push(g.fen());
+    }
+    state.reviewMode = true;
+    state.gameOver = true;
+    state.aiThinking = false;
+    state.match = null;
+    renderMatch();
+    state.game = g;
+    state.positions = positions;
+    state.records = records;
+    state.humanColor = game.humanColor;
+    state.orientation = game.humanColor;
+    state.viewPly = 0;
+    state.selected = null;
+    state.legalForSelected = [];
+    state.lastMove = null;
+    state.hint = null;
+    coachLog.length = 0;
+
+    setStatus('Reviewing: vs ' + game.opponent + ' — ' + (game.status || ''));
+    renderReviewBanner(game);
+    render();
+    renderCoach();
+    updateRatedBadge();
+    navTo(0);
+  }
+
+  function renderReviewBanner(game) {
+    var main = document.querySelector('main.board-area');
+    var existing = $('reviewBanner');
+    if (!state.reviewMode) {
+      if (existing) existing.remove();
+      return;
+    }
+    if (!existing) {
+      existing = document.createElement('div');
+      existing.id = 'reviewBanner';
+      existing.className = 'review-banner';
+      main.insertBefore(existing, main.firstChild);
+    }
+    existing.innerHTML = '<span>Reviewing a saved game — use ◀ ▶ to step through moves.</span>';
+    var btn = document.createElement('button');
+    btn.className = 'btn';
+    btn.textContent = 'Exit review';
+    btn.addEventListener('click', function () { newGame(); });
+    existing.appendChild(btn);
+  }
+
+  function exitReview(silent) {
+    if (state.reviewMode) {
+      state.reviewMode = false;
+      renderReviewBanner();
+      if (!silent) render();
+    }
   }
 
   // ---- Rendering --------------------------------------------------------
@@ -448,8 +910,8 @@
 
     $('bottomDot').className = 'dot ' + (bottomColor === 'w' ? 'white' : 'black');
     $('topDot').className = 'dot ' + (topColor === 'w' ? 'white' : 'black');
-    $('bottomName').textContent = bottomColor === state.humanColor ? 'You' : state.ai.level.name;
-    $('topName').textContent = topColor === state.humanColor ? 'You' : state.ai.level.name;
+    $('bottomName').textContent = bottomColor === state.humanColor ? 'You' : aiName();
+    $('topName').textContent = topColor === state.humanColor ? 'You' : aiName();
 
     var caps = capturedPieces();
     // captured shown next to the capturer
@@ -676,7 +1138,7 @@
   function scheduleAiMove() {
     if (state.gameOver) return;
     state.aiThinking = true;
-    setStatus('<span class="thinking">' + state.ai.level.name + ' is thinking…</span>');
+    setStatus('<span class="thinking">' + aiName() + ' is thinking…</span>');
     // yield to the browser so the UI can paint the "thinking" state
     setTimeout(function () {
       if (state.gameOver) {
@@ -714,7 +1176,7 @@
         }
         return;
       }
-      var res = state.ai.analyze(g, 3);
+      var res = state.analyzer.analyze(g, 3);
       if (!res) return;
       state.lastEvalWhite = res.whiteScore;
       state.preMoveAnalysis = res;
@@ -884,7 +1346,7 @@
   function showHint() {
     if (state.gameOver || state.aiThinking || !isLiveView()) return;
     if (state.game.turn !== state.humanColor) return;
-    var res = state.preMoveAnalysis || state.ai.analyze(state.game, 3);
+    var res = state.preMoveAnalysis || state.analyzer.analyze(state.game, 3);
     if (res && res.bestMove) {
       markAssisted(); // using a hint makes the game Casual (unrated)
       state.hint = {from: res.bestMove.from, to: res.bestMove.to};
@@ -949,7 +1411,7 @@
   }
 
   function undoMove() {
-    if (state.records.length === 0 || state.aiThinking) return;
+    if (state.records.length === 0 || state.aiThinking || state.reviewMode) return;
     // Undo back to the human's previous turn: remove last ply, and if the
     // last mover was the engine, remove the human ply too so it's the human's move.
     var removeCount = 1;

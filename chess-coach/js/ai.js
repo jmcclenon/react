@@ -118,12 +118,28 @@
     return queens === 0 || (queens <= 2 && majorMinor <= 2);
   }
 
+  // Chebyshev (king-move) distance between two board indices.
+  function chebyshev(a, b) {
+    var dr = Math.abs(rankOf(a) - rankOf(b));
+    var df = Math.abs(fileOf(a) - fileOf(b));
+    return Math.max(dr, df);
+  }
+
+  // Tropism weight per piece type when measuring pressure on the enemy king.
+  var TROPISM = {n: 2, b: 2, r: 3, q: 5, p: 0, k: 0};
+
   // Static evaluation from White's perspective (positive = White better).
-  function evaluate(chess) {
+  // An optional `style` reshapes the same position into a personality:
+  //   material — multiplier on the raw material+PST balance
+  //   attack   — weight on piece pressure toward the enemy king (both sides),
+  //              so an aggressive engine will sacrifice material for an attack
+  //   position — multiplier on positional bonuses (bishop pair, etc.)
+  function evaluate(chess, style) {
     var board = chess.board;
-    var score = 0;
+    var base = 0; // material + piece-square tables
+    var positional = 0; // style-scalable positional bonuses
     var endgame = isEndgame(board);
-    var i, p, t, c, sq;
+    var i, p, t, c;
 
     for (i = 0; i < 64; i++) {
       p = board[i];
@@ -132,37 +148,61 @@
       c = colorOf(p);
       var val = PIECE_VALUE[t];
       var table = t === 'k' ? (endgame ? PST.kEnd : PST.k) : PST[t];
-      var pstVal;
-      if (c === 'w') {
-        pstVal = table[i];
-        score += val + pstVal;
-      } else {
-        pstVal = table[mirror(i)];
-        score -= val + pstVal;
-      }
+      if (c === 'w') base += val + table[i];
+      else base -= val + table[mirror(i)];
     }
 
-    // Mobility: small bonus per legal move for the side to move; approximate
-    // by counting pseudo-moves for both sides is expensive, so use a light
-    // heuristic based on the side to move's move count.
-    // (Kept cheap for browser performance.)
-
-    // Bishop pair bonus.
+    // Bishop pair bonus (a positional consideration).
     var wb = 0, bb = 0;
     for (i = 0; i < 64; i++) {
       if (board[i] === 'B') wb++;
       else if (board[i] === 'b') bb++;
     }
-    if (wb >= 2) score += 30;
-    if (bb >= 2) score -= 30;
+    if (wb >= 2) positional += 30;
+    if (bb >= 2) positional -= 30;
+
+    if (!style) return base + positional;
+
+    var matMul = style.material == null ? 1 : style.material;
+    var posMul = style.position == null ? 1 : style.position;
+    var attackW = style.attack || 0;
+
+    var score = base * matMul + positional * posMul;
+
+    if (attackW !== 0) {
+      var wk = chess.kingIndex('w');
+      var bk = chess.kingIndex('b');
+      var whiteAttack = 0, blackAttack = 0;
+      for (i = 0; i < 64; i++) {
+        p = board[i];
+        if (p === null) continue;
+        t = typeOf(p);
+        if (t === 'k' || t === 'p') continue;
+        c = colorOf(p);
+        if (c === 'w') whiteAttack += (7 - chebyshev(i, bk)) * TROPISM[t];
+        else blackAttack += (7 - chebyshev(i, wk)) * TROPISM[t];
+      }
+      score += attackW * (whiteAttack - blackAttack);
+    }
 
     return score;
   }
+
+  // Playing styles. `attack` is in centipawns per tropism point (small).
+  var STYLES = {
+    balanced: {key: 'balanced', label: 'Balanced', material: 1.0, position: 1.0, attack: 0.4, blurb: 'Plays solid, all-round chess.'},
+    aggressive: {key: 'aggressive', label: 'Aggressive', material: 0.92, position: 1.0, attack: 1.6, blurb: 'Throws pieces at your king and loves the initiative.'},
+    tactical: {key: 'tactical', label: 'Tactical', material: 0.82, position: 1.05, attack: 2.0, blurb: 'Sacrifices material for attacks and complications.'},
+    positional: {key: 'positional', label: 'Positional', material: 1.0, position: 1.35, attack: 0.2, blurb: 'Squeezes slowly with structure and good pieces.'},
+    defensive: {key: 'defensive', label: 'Solid / Defensive', material: 1.12, position: 0.95, attack: 0.15, blurb: 'Trades down, hoards material, and defends stubbornly.'},
+  };
 
   var MATE = 100000;
 
   function AI(level) {
     this.setLevel(level || AI.LEVELS[0]);
+    this.style = null; // null → objective evaluation (used by the analyzer)
+    this.persona = null; // {name, styleKey, levelIndex}
     this.nodes = 0;
     this.deadline = Infinity;
     this.timedOut = false;
@@ -193,6 +233,47 @@
       level = AI.LEVELS[Math.max(0, Math.min(AI.LEVELS.length - 1, level))];
     }
     this.level = level;
+  };
+
+  AI.STYLES = STYLES;
+
+  // A roster of named opponents: several distinct playing styles at each ELO
+  // band. `level` indexes AI.LEVELS; `style` indexes AI.STYLES.
+  AI.ROSTER = [
+    // Beginner (~600)
+    {name: 'Pip', level: 0, style: 'aggressive'},
+    {name: 'Daisy', level: 0, style: 'balanced'},
+    {name: 'Turtle Ted', level: 0, style: 'defensive'},
+    // Casual (~1000)
+    {name: 'Gambit Gwen', level: 1, style: 'tactical'},
+    {name: 'Steady Sam', level: 1, style: 'positional'},
+    {name: 'Reckless Rhea', level: 1, style: 'aggressive'},
+    // Intermediate (~1400)
+    {name: 'Tactician Tara', level: 2, style: 'tactical'},
+    {name: 'Fortress Finn', level: 2, style: 'defensive'},
+    {name: 'Centre Cara', level: 2, style: 'positional'},
+    // Advanced (~1800)
+    {name: 'Blitz Boris', level: 3, style: 'aggressive'},
+    {name: 'Maestro Mira', level: 3, style: 'positional'},
+    {name: 'Trapper Tom', level: 3, style: 'tactical'},
+    // Expert (~2100)
+    {name: 'Sniper Sena', level: 4, style: 'aggressive'},
+    {name: 'Anchor Ana', level: 4, style: 'defensive'},
+    {name: 'Professor Quill', level: 4, style: 'positional'},
+    // Grandmaster (~2500)
+    {name: 'GM Volkov', level: 5, style: 'aggressive'},
+    {name: 'GM Petrosian-style', level: 5, style: 'defensive'},
+    {name: 'GM Capablanca-style', level: 5, style: 'positional'},
+    {name: 'GM Tal-style', level: 5, style: 'tactical'},
+  ];
+
+  // Configure this engine as a specific roster persona.
+  AI.prototype.setPersona = function (persona) {
+    this.persona = persona;
+    this.setLevel(persona.level);
+    this.style = STYLES[persona.style] || STYLES.balanced;
+    this.displayName = persona.name;
+    return this;
   };
 
   // Order moves to improve alpha-beta pruning: captures first (MVV-LVA),
@@ -229,8 +310,8 @@
   // Quiescence search: only extend captures to reach a "quiet" position.
   AI.prototype.quiescence = function (chess, alpha, beta, color) {
     this.nodes++;
-    if (this.checkTime()) return color === 'w' ? evaluate(chess) : -evaluate(chess);
-    var standPat = color === 'w' ? evaluate(chess) : -evaluate(chess);
+    if (this.checkTime()) return color === 'w' ? evaluate(chess, this.style) : -evaluate(chess, this.style);
+    var standPat = color === 'w' ? evaluate(chess, this.style) : -evaluate(chess, this.style);
     if (standPat >= beta) return beta;
     if (alpha < standPat) alpha = standPat;
 
@@ -264,7 +345,7 @@
       if (this.level.quiescence) {
         return this.quiescence(chess, alpha, beta, color);
       }
-      return color === 'w' ? evaluate(chess) : -evaluate(chess);
+      return color === 'w' ? evaluate(chess, this.style) : -evaluate(chess, this.style);
     }
 
     moves = orderMoves(moves);
