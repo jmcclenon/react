@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chess Coach — Learn Openings & Strategy</title>
+    <link rel="stylesheet" href="css/styles.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♞</text></svg>"
+    />
+  </head>
+  <body>
+    <header class="app-header">
+      <span class="logo">♞</span>
+      <h1>Chess Coach</h1>
+      <span class="tagline">
+        Learn openings, strategy &amp; positioning — play from Beginner to
+        Grandmaster
+      </span>
+    </header>
+
+    <div class="layout">
+      <!-- LEFT: settings & controls -->
+      <aside>
+        <section class="panel">
+          <h2>Game Setup</h2>
+          <label class="field" for="level">Opponent strength</label>
+          <select id="level"></select>
+          <div class="level-meta" id="levelMeta"></div>
+
+          <label class="field" for="side">Play as</label>
+          <select id="side">
+            <option value="w">White</option>
+            <option value="b">Black</option>
+          </select>
+
+          <div class="control-row" style="margin-top: 14px">
+            <button class="btn primary" id="newGame">New Game</button>
+            <button class="btn danger" id="resign">Resign</button>
+          </div>
+          <div class="control-row">
+            <button class="btn" id="flipBoard">Flip Board</button>
+            <button class="btn" id="hintBtn">Hint</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Clocks</h2>
+          <div class="toggle-row">
+            <label for="clockEnabled">Use clocks</label>
+            <label class="switch">
+              <input type="checkbox" id="clockEnabled" />
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div id="clockConfig">
+            <div class="inline-fields">
+              <div>
+                <label class="field" for="clockMinutes">Minutes</label>
+                <input type="number" id="clockMinutes" value="10" min="1" max="180" />
+              </div>
+              <div>
+                <label class="field" for="clockIncrement">Increment (s)</label>
+                <input type="number" id="clockIncrement" value="5" min="0" max="60" />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Coaching &amp; Analysis</h2>
+          <div class="toggle-row">
+            <label for="coachEnabled">Coach mode (tips &amp; openings)</label>
+            <label class="switch">
+              <input type="checkbox" id="coachEnabled" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <label for="analysisEnabled">Live analysis (eval bar)</label>
+            <label class="switch">
+              <input type="checkbox" id="analysisEnabled" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <label for="showHints">Show legal-move dots</label>
+            <label class="switch">
+              <input type="checkbox" id="showHints" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </section>
+      </aside>
+
+      <!-- CENTER: board -->
+      <main class="board-area">
+        <div class="player-bar" id="topBar">
+          <div class="who">
+            <span class="dot black" id="topDot"></span>
+            <span id="topName">Opponent</span>
+            <span class="captured" id="topCaptured"></span>
+          </div>
+          <div class="clock" id="topClock">10:00</div>
+        </div>
+
+        <div class="board-with-eval">
+          <div class="eval-bar" id="evalBar">
+            <div class="white-fill" id="evalFill"></div>
+            <div class="eval-num" id="evalNum">0.0</div>
+          </div>
+          <div class="board-wrap">
+            <div class="board" id="board"></div>
+          </div>
+        </div>
+
+        <div class="player-bar" id="bottomBar">
+          <div class="who">
+            <span class="dot white" id="bottomDot"></span>
+            <span id="bottomName">You</span>
+            <span class="captured" id="bottomCaptured"></span>
+          </div>
+          <div class="clock" id="bottomClock">10:00</div>
+        </div>
+
+        <div class="status-line" id="status"></div>
+      </main>
+
+      <!-- RIGHT: coach + history -->
+      <aside>
+        <section class="panel">
+          <h2>Coach</h2>
+          <div id="coachPanel">
+            <div class="opening-name" id="openingName">Starting position</div>
+            <div id="coachMessages"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Analysis</h2>
+          <div id="analysisPanel">
+            <div class="status-line" id="analysisStatus" style="text-align:left;font-weight:400;color:var(--muted)">
+              Enable live analysis to see the evaluation and best moves.
+            </div>
+            <div id="analysisLines"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Move History</h2>
+          <div class="moves" id="movesWrap">
+            <table id="movesTable">
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="nav-row">
+            <button class="btn" id="navStart">⏮</button>
+            <button class="btn" id="navPrev">◀</button>
+            <button class="btn" id="navNext">▶</button>
+            <button class="btn" id="navEnd">⏭</button>
+          </div>
+          <div class="control-row" style="margin-top: 8px">
+            <button class="btn" id="undoMove">Undo Move</button>
+            <button class="btn" id="copyPgn">Copy PGN</button>
+          </div>
+        </section>
+      </aside>
+    </div>
+
+    <footer>
+      Chess Coach — a self-contained teaching chess app. Built with a custom
+      rules engine, minimax AI, an opening book, and a principle-based coach.
+    </footer>
+
+    <!-- Promotion dialog -->
+    <div class="modal-backdrop" id="promoModal">
+      <div class="promo-dialog">
+        <h3>Promote pawn to…</h3>
+        <div class="promo-choices" id="promoChoices"></div>
+      </div>
+    </div>
+
+    <script src="js/engine.js"></script>
+    <script src="js/ai.js"></script>
+    <script src="js/coach.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
