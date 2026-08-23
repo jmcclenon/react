@@ -806,7 +806,7 @@
     return options[0].move;
   };
 
-  AI.prototype.chooseMove = function (chess, sanHistory) {
+  AI.prototype.chooseMove = function (chess, sanHistory, opts) {
     var legal = chess.generateLegalMoves();
     if (legal.length === 0) return null;
 
@@ -823,7 +823,9 @@
       return legal[Math.floor(Math.random() * legal.length)];
     }
 
-    var result = this.search(chess, {noise: this.level.noise || 0});
+    var sopts = {noise: this.level.noise || 0};
+    if (opts && opts.timeMs) sopts.timeMs = opts.timeMs;
+    var result = this.search(chess, sopts);
     return result ? result.best : legal[0];
   };
 

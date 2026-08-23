@@ -92,6 +92,11 @@ Six levels, each with its own search depth, thinking-time budget, and
   Evaluation blends material, piece-square tables (middlegame/endgame king),
   pawn structure (doubled/isolated/passed), rook files, king safety, the bishop
   pair, and a tempo bonus — plus per-personality style weighting.
+- **Web Worker**: the search runs in a background worker (built from an inlined
+  Blob so it works even from a `file://` single-file page), so the UI never
+  freezes while the AI thinks — which also lets the top levels think a little
+  longer. Where a worker can't be created (e.g. a strict sandbox), it falls
+  back to running on the main thread.
 - **Opening book**: all AIs play real, varied theory drawn from the opening
   library (weighted by style) before the search takes over.
 - **Player profile**: name, nickname, and "member since" date, alongside your

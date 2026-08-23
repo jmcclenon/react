@@ -59,6 +59,9 @@
     match: null, // {format, needWins, games:[], you, opp, gameNo, persona, humanColorGame1, over, matchWinner}
     // replay
     reviewMode: false, // true when viewing a loaded/saved game (no live play)
+    // search generation — bumped whenever the position context changes so that
+    // stale asynchronous (worker) results can be discarded.
+    searchGen: 0,
   };
 
   // Persistent player rating profile (Elo-style). Only "uncoached" games count.
@@ -269,6 +272,124 @@
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   }
 
+  // ---- Engine client (Web Worker with a synchronous fallback) -----------
+  // The chess search is heavy, so we run it in a Web Worker to keep the UI
+  // responsive. The worker is built from the inlined engine sources (so it
+  // works even from a file:// single-file page); where a worker can't be
+  // created (e.g. a strict sandbox), we fall back to running on the main
+  // thread exactly as before.
+
+  // This function's source text is stringified into the worker. It reconstructs
+  // AI instances inside the worker and answers 'move' / 'analyze' requests.
+  function workerBody() {
+    var Chess = self.Chess, ChessAI = self.ChessAI;
+    var opponents = {};
+    var analyzer = new ChessAI();
+    function getOpp(idx) {
+      if (!opponents[idx]) {
+        var a = new ChessAI();
+        a.setPersona(ChessAI.ROSTER[idx]);
+        opponents[idx] = a;
+      }
+      return opponents[idx];
+    }
+    self.onmessage = function (e) {
+      var msg = e.data;
+      try {
+        if (msg.type === 'move') {
+          var ai = getOpp(msg.personaIndex);
+          ai.setOpening(msg.chosenOpening && msg.chosenOpening.length ? msg.chosenOpening : null);
+          var m = ai.chooseMove(new Chess(msg.fen), msg.sanHistory || [], {timeMs: msg.timeMs});
+          self.postMessage({id: msg.id, move: m ? {from: m.from, to: m.to, promotion: m.promotion || null} : null});
+        } else if (msg.type === 'analyze') {
+          var c = new Chess(msg.fen);
+          var res = analyzer.analyze(c, msg.depth || 4);
+          if (!res) { self.postMessage({id: msg.id, result: null}); return; }
+          var probe = new Chess(msg.fen);
+          var ranked = res.ranked.map(function (r, i) {
+            var e2 = {from: r.move.from, to: r.move.to, promotion: r.move.promotion || null, score: r.score};
+            if (i < 3) e2.san = probe.toSan(r.move);
+            return e2;
+          });
+          var bm = res.bestMove;
+          self.postMessage({id: msg.id, result: {
+            whiteScore: res.whiteScore, turn: msg.fen.split(' ')[1],
+            bestMove: {from: bm.from, to: bm.to, promotion: bm.promotion || null, san: probe.toSan(bm)},
+            ranked: ranked,
+          }});
+        }
+      } catch (err) {
+        self.postMessage({id: msg.id, error: String(err && err.message || err)});
+      }
+    };
+  }
+
+  function createEngineClient() {
+    var worker = null, pending = {}, nextId = 1;
+    try {
+      var nodes = document.querySelectorAll('script[data-engine]');
+      var src = '';
+      for (var i = 0; i < nodes.length; i++) src += nodes[i].textContent + '\n';
+      if (src.trim().length > 2000) { // inline engine sources are present
+        src += '\n(' + workerBody.toString() + ')();';
+        var blob = new Blob([src], {type: 'application/javascript'});
+        worker = new Worker(URL.createObjectURL(blob));
+        worker.onmessage = function (e) {
+          var d = e.data, cb = pending[d.id];
+          if (cb) { delete pending[d.id]; cb(d); }
+        };
+        worker.onerror = function () { worker = null; }; // fall back on error
+      }
+    } catch (e) {
+      worker = null;
+    }
+
+    function post(msg, cb) { msg.id = nextId++; pending[msg.id] = cb; worker.postMessage(msg); }
+
+    return {
+      usingWorker: function () { return !!worker; },
+      requestMove: function (req, cb) {
+        if (worker) {
+          post({type: 'move', fen: req.fen, sanHistory: req.sanHistory, personaIndex: req.personaIndex, chosenOpening: req.chosenOpening, timeMs: req.timeMs}, function (d) { cb(d && d.move ? d.move : null); });
+        } else {
+          setTimeout(function () {
+            var m = state.ai.chooseMove(new Chess(req.fen), req.sanHistory, {timeMs: req.timeMs});
+            cb(m ? {from: m.from, to: m.to, promotion: m.promotion || null} : null);
+          }, 20);
+        }
+      },
+      requestAnalyze: function (req, cb) {
+        if (worker) {
+          post({type: 'analyze', fen: req.fen, depth: req.depth}, function (d) { cb(d ? d.result : null); });
+        } else {
+          setTimeout(function () {
+            cb(normalizeAnalysis(state.analyzer.analyze(new Chess(req.fen), req.depth), req.fen));
+          }, 10);
+        }
+      },
+    };
+  }
+
+  // Convert an AI.analyze() result into the wire shape used everywhere on the
+  // main thread (so the worker and fallback paths are interchangeable).
+  function normalizeAnalysis(res, fen) {
+    if (!res) return null;
+    var probe = new Chess(fen);
+    var ranked = res.ranked.map(function (r, i) {
+      var e = {from: r.move.from, to: r.move.to, promotion: r.move.promotion || null, score: r.score};
+      if (i < 3) e.san = probe.toSan(r.move);
+      return e;
+    });
+    var bm = res.bestMove;
+    return {
+      whiteScore: res.whiteScore, turn: fen.split(' ')[1],
+      bestMove: {from: bm.from, to: bm.to, promotion: bm.promotion || null, san: probe.toSan(bm)},
+      ranked: ranked,
+    };
+  }
+
+  var engine = null; // created in init()
+
   // Apply a finished game's result (from the human's perspective) to the rating
   // profile. Runs at most once per game. Only uncoached games change the rating.
   function applyGameResult(humanResult) {
@@ -374,6 +495,8 @@
     updateOpeningBookVisibility();
     buildBoardCells();
     bindControls();
+    engine = createEngineClient();
+    try { window.__engineWorker = engine.usingWorker(); } catch (e) {}
     renderProfile();
     renderRating();
     renderSavedGames();
@@ -649,6 +772,7 @@
   // Assumes the opponent persona and game settings are already configured.
   function beginGame(humanColor) {
     stopClock();
+    state.searchGen++; // invalidate any in-flight worker results
     state.reviewMode = false;
     state.humanColor = humanColor;
     state.orientation = humanColor;
@@ -913,6 +1037,8 @@
     var game = savedGames.find(function (g) { return g.id === id; });
     if (!game) return;
     stopClock();
+    state.searchGen++; // invalidate any in-flight worker results
+    state.aiThinking = false;
     var g = new Chess();
     var positions = [g.fen()];
     var records = [];
@@ -1237,9 +1363,9 @@
     if (!pre || !pre.ranked) return null;
     var wantPromo = rec.move.promotion || null;
     for (var i = 0; i < pre.ranked.length; i++) {
-      var m = pre.ranked[i].move;
-      if (m.from === rec.move.from && m.to === rec.move.to && (m.promotion || null) === wantPromo) {
-        return {entry: pre.ranked[i], rank: i};
+      var e = pre.ranked[i];
+      if (e.from === rec.move.from && e.to === rec.move.to && (e.promotion || null) === wantPromo) {
+        return {entry: e, rank: i};
       }
     }
     return null;
@@ -1312,25 +1438,29 @@
     if (state.gameOver) return;
     state.aiThinking = true;
     setStatus('<span class="thinking">' + aiName() + ' is thinking…</span>');
-    // yield to the browser so the UI can paint the "thinking" state
-    setTimeout(function () {
-      if (state.gameOver) {
-        state.aiThinking = false;
-        return;
-      }
-      var pre = state.preMoveAnalysis;
-      var sanHistory = state.records.map(function (r) { return r.san; });
-      var move = state.ai.chooseMove(state.game, sanHistory);
-      if (!move) {
-        state.aiThinking = false;
-        checkGameEnd();
-        return;
-      }
-      var rec = state.game.move({from: move.from, to: move.to, promotion: move.promotion ? Chess.typeOf(move.promotion) : null});
+
+    var gen = state.searchGen;
+    var pre = state.preMoveAnalysis;
+    var spec = state.ai.specialist ? selectedSpecialistOpening() : null;
+    // The worker can afford a longer think without freezing the UI.
+    var base = state.ai.level.timeMs;
+    var req = {
+      fen: state.game.fen(),
+      sanHistory: state.records.map(function (r) { return r.san; }),
+      personaIndex: currentPersonaIndex(),
+      chosenOpening: spec ? spec.moves : null,
+      timeMs: engine.usingWorker() ? Math.min(6000, Math.round(base * 1.7)) : base,
+    };
+    engine.requestMove(req, function (move) {
+      if (gen !== state.searchGen) return; // a new game / undo happened meanwhile
       state.aiThinking = false;
+      if (state.gameOver) return;
+      if (!move) { checkGameEnd(); return; }
+      var rec = state.game.move({from: move.from, to: move.to, promotion: move.promotion ? Chess.typeOf(move.promotion) : null});
+      if (!rec) { checkGameEnd(); return; }
       setStatus('');
       finalizeMove(rec, pre, false);
-    }, 220);
+    });
   }
 
   // ---- Analysis & coaching ---------------------------------------------
@@ -1338,46 +1468,49 @@
   // depend on it); only renders the eval bar / lines when analysis display is
   // enabled. Runs on a timeout so the UI can paint first.
   function refreshAnalysis() {
-    if (state.analysisEnabled) $('analysisStatus').classList.add('hidden');
-    setTimeout(function () {
-      var g = state.game;
-      if (g.generateLegalMoves().length === 0) {
-        state.preMoveAnalysis = null;
-        if (state.analysisEnabled) {
-          var w = g.isCheckmate() ? (g.turn === 'w' ? -ChessAI.MATE : ChessAI.MATE) : 0;
-          setEvalBar(w, true);
-          $('analysisLines').innerHTML = '';
-        }
-        return;
+    var g = state.game;
+    if (g.generateLegalMoves().length === 0) {
+      state.preMoveAnalysis = null;
+      if (state.analysisEnabled) {
+        var w = g.isCheckmate() ? (g.turn === 'w' ? -ChessAI.MATE : ChessAI.MATE) : 0;
+        setEvalBar(w, true);
+        $('analysisLines').innerHTML = '';
       }
-      var res = state.analyzer.analyze(g, 4);
-      if (!res) return;
+      return;
+    }
+    // Skip analysis entirely in fully-unassisted (rated) play — nothing needs it.
+    if (!state.analysisEnabled && !state.coachEnabled) {
+      state.preMoveAnalysis = null;
+      return;
+    }
+    if (state.analysisEnabled) $('analysisStatus').classList.add('hidden');
+
+    var gen = state.searchGen;
+    engine.requestAnalyze({fen: g.fen(), depth: 4}, function (res) {
+      if (gen !== state.searchGen || !res) return;
       state.lastEvalWhite = res.whiteScore;
       state.preMoveAnalysis = res;
       if (state.analysisEnabled) {
         setEvalBar(res.whiteScore, true);
-        renderAnalysisLines(res, g);
+        renderAnalysisLines(res);
       }
-    }, 10);
+    });
   }
   // Backwards-compatible alias used at game start / after undo.
   function runAnalysis() {
     refreshAnalysis();
   }
 
-  function renderAnalysisLines(res, g) {
+  function renderAnalysisLines(res) {
     var wrap = $('analysisLines');
     wrap.innerHTML = '';
-    var top = res.ranked.slice(0, 3);
-    top.forEach(function (r, i) {
-      var probe = new Chess(g.fen());
-      var san = probe.toSan(r.move);
+    res.ranked.slice(0, 3).forEach(function (r, i) {
       var line = document.createElement('div');
       line.className = 'analysis-line';
-      var whiteCp = g.turn === 'w' ? r.score : -r.score;
+      var whiteCp = res.turn === 'w' ? r.score : -r.score;
       var label = document.createElement('span');
       label.className = 'san';
-      label.textContent = (i + 1) + '. ' + san;
+      label.textContent = (i + 1) + '. ' + (r.san || '');
       var cp = document.createElement('span');
       cp.className = 'cp';
       cp.textContent = formatEval(whiteCp);
@@ -1530,14 +1663,24 @@
   function showHint() {
     if (state.gameOver || state.aiThinking || !isLiveView()) return;
     if (state.game.turn !== state.humanColor) return;
-    var res = state.preMoveAnalysis || state.analyzer.analyze(state.game, 4);
-    if (res && res.bestMove) {
-      markAssisted(); // using a hint makes the game Casual (unrated)
-      state.hint = {from: res.bestMove.from, to: res.bestMove.to};
-      var probe = new Chess(state.game.fen());
-      var san = probe.toSan(res.bestMove);
-      setStatus('Hint: consider <strong>' + san + '</strong>');
+    markAssisted(); // using a hint makes the game Casual (unrated)
+
+    function showBest(bm) {
+      if (!bm) return;
+      state.hint = {from: bm.from, to: bm.to};
+      setStatus('Hint: consider <strong>' + bm.san + '</strong>');
       render();
+    }
+
+    if (state.preMoveAnalysis && state.preMoveAnalysis.bestMove) {
+      showBest(state.preMoveAnalysis.bestMove);
+    } else {
+      setStatus('<span class="thinking">Thinking of a hint…</span>');
+      var gen = state.searchGen;
+      engine.requestAnalyze({fen: state.game.fen(), depth: 4}, function (res) {
+        if (gen !== state.searchGen || !res) return;
+        showBest(res.bestMove);
+      });
     }
   }
 
@@ -1601,6 +1744,7 @@
 
   function undoMove() {
     if (state.records.length === 0 || state.aiThinking || state.reviewMode) return;
+    state.searchGen++; // invalidate any in-flight worker results
     // Undo back to the human's previous turn: remove last ply, and if the
     // last mover was the engine, remove the human ply too so it's the human's move.
     var removeCount = 1;
