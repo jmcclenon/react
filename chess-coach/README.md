@@ -82,11 +82,18 @@ Six levels, each with its own search depth, thinking-time budget, and
   passant, promotion, check/checkmate/stalemate, draws), SAN + FEN support. It
   passes `perft` verification against the standard reference positions
   (startpos, Kiwipete, and positions 3–5) at every tested depth.
-- **AI** (`ai.js`): negamax with alpha-beta pruning, MVV-LVA move ordering, a
-  quiescence search to tame the horizon effect, and **iterative deepening under
-  a per-move time budget** so even the Grandmaster level stays responsive.
-  Evaluation blends material, piece-square tables (with a middlegame/endgame
-  king table), and the bishop pair.
+- **AI** (`ai.js`): a proper alpha-beta engine — **principal-variation search
+  with a Zobrist-hashed transposition table**, killer-move and history-heuristic
+  ordering, MVV-LVA captures, a quiescence search, and **iterative deepening
+  under a per-move time budget**. Legality is checked lazily during search (a
+  big speedup), so the Grandmaster reaches a serious depth in a few seconds.
+  Evaluation blends material, piece-square tables (middlegame/endgame king),
+  pawn structure (doubled/isolated/passed), rook files, king safety, the bishop
+  pair, and a tempo bonus — plus per-personality style weighting.
+- **Opening book**: all AIs play real, varied theory drawn from the opening
+  library (weighted by style) before the search takes over.
+- **Player profile**: name, nickname, and "member since" date, alongside your
+  Elo rating, record, and rating-history graph — all saved locally.
 - **Coach** (`coach.js`): an opening book keyed by move sequence plus a
   principle engine and a centipawn-loss move classifier.
 

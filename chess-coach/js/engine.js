@@ -69,6 +69,22 @@
     return df <= maxFileDelta;
   }
 
+  // ---- Zobrist hashing --------------------------------------------------
+  // A 32-bit position hash maintained incrementally on make/undo, used by the
+  // AI's transposition table. Kept as an unsigned 32-bit int throughout.
+  function rand32() {
+    return (Math.random() * 0x100000000) >>> 0;
+  }
+  var ZOB = {pieces: {}, side: rand32(), castling: {}, ep: []};
+  'PNBRQKpnbrqk'.split('').forEach(function (pc) {
+    ZOB.pieces[pc] = [];
+    for (var i = 0; i < 64; i++) ZOB.pieces[pc][i] = rand32();
+  });
+  ['K', 'Q', 'k', 'q'].forEach(function (r) {
+    ZOB.castling[r] = rand32();
+  });
+  for (var _f = 0; _f < 8; _f++) ZOB.ep[_f] = rand32();
+
   function Chess(fen) {
     this.board = new Array(64).fill(null);
     this.turn = WHITE;
@@ -77,8 +93,25 @@
     this.halfmoves = 0;
     this.fullmoves = 1;
     this.history = [];
+    this.hash = 0;
     this.load(fen || START_FEN);
   }
+
+  // Recompute the full Zobrist hash from the current position.
+  Chess.prototype.computeHash = function () {
+    var h = 0;
+    for (var i = 0; i < 64; i++) {
+      var p = this.board[i];
+      if (p !== null) h = (h ^ ZOB.pieces[p][i]) >>> 0;
+    }
+    if (this.turn === BLACK) h = (h ^ ZOB.side) >>> 0;
+    if (this.castling.K) h = (h ^ ZOB.castling.K) >>> 0;
+    if (this.castling.Q) h = (h ^ ZOB.castling.Q) >>> 0;
+    if (this.castling.k) h = (h ^ ZOB.castling.k) >>> 0;
+    if (this.castling.q) h = (h ^ ZOB.castling.q) >>> 0;
+    if (this.epSquare !== null) h = (h ^ ZOB.ep[fileOf(this.epSquare)]) >>> 0;
+    return h >>> 0;
+  };
 
   Chess.WHITE = WHITE;
   Chess.BLACK = BLACK;
@@ -114,6 +147,7 @@
     this.halfmoves = parts[4] ? parseInt(parts[4], 10) : 0;
     this.fullmoves = parts[5] ? parseInt(parts[5], 10) : 1;
     this.history = [];
+    this.hash = this.computeHash();
   };
 
   Chess.prototype.fen = function () {
@@ -171,48 +205,54 @@
   };
 
   // Is `square` attacked by any piece of `byColor`?
+  // Hot path — kept allocation-free with inlined file/rank math (x & 7, x >> 3).
   Chess.prototype.isSquareAttacked = function (square, byColor) {
     var board = this.board;
-    var i, to, p;
+    var sf = square & 7;
+    var white = byColor === WHITE;
+    var p, next, nf, prevf;
 
-    // Pawn attacks: a pawn of byColor attacks diagonally "forward".
-    // White pawns move up (toward rank 0), so they attack from rank+1.
-    var pawn = byColor === WHITE ? 'P' : 'p';
-    var pawnDir = byColor === WHITE ? 8 : -8; // where the attacking pawn sits, relative
-    // If byColor is White, an attacked square is hit by white pawns located at square+7 / square+9.
-    var pawnFrom = byColor === WHITE ? [7, 9] : [-7, -9];
-    for (i = 0; i < 2; i++) {
-      var pf = square + pawnFrom[i];
-      if (pf >= 0 && pf < 64 && Math.abs(fileOf(pf) - fileOf(square)) === 1) {
-        if (board[pf] === pawn) return true;
-      }
+    // Pawn attacks.
+    if (white) {
+      if (sf > 0 && square + 7 < 64 && board[square + 7] === 'P') return true;
+      if (sf < 7 && square + 9 < 64 && board[square + 9] === 'P') return true;
+    } else {
+      if (sf < 7 && square - 7 >= 0 && board[square - 7] === 'p') return true;
+      if (sf > 0 && square - 9 >= 0 && board[square - 9] === 'p') return true;
     }
 
     // Knight attacks.
-    var knight = byColor === WHITE ? 'N' : 'n';
-    for (i = 0; i < KNIGHT_OFFSETS.length; i++) {
-      to = square + KNIGHT_OFFSETS[i];
-      if (withinBoard(square, to, 2) && board[to] === knight) return true;
+    var knight = white ? 'N' : 'n';
+    for (var i = 0; i < 8; i++) {
+      next = square + KNIGHT_OFFSETS[i];
+      if (next < 0 || next > 63) continue;
+      nf = next & 7;
+      if (nf - sf > 2 || sf - nf > 2) continue; // wrapped
+      if (board[next] === knight) return true;
     }
 
     // King attacks.
-    var king = byColor === WHITE ? 'K' : 'k';
-    for (i = 0; i < KING_OFFSETS.length; i++) {
-      to = square + KING_OFFSETS[i];
-      if (withinBoard(square, to, 1) && board[to] === king) return true;
+    var king = white ? 'K' : 'k';
+    for (i = 0; i < 8; i++) {
+      next = square + KING_OFFSETS[i];
+      if (next < 0 || next > 63) continue;
+      nf = next & 7;
+      if (nf - sf > 1 || sf - nf > 1) continue; // wrapped
+      if (board[next] === king) return true;
     }
 
     // Sliding: bishop/queen on diagonals.
-    var bishop = byColor === WHITE ? 'B' : 'b';
-    var queen = byColor === WHITE ? 'Q' : 'q';
-    var rook = byColor === WHITE ? 'R' : 'r';
-    for (i = 0; i < BISHOP_DIRS.length; i++) {
+    var bishop = white ? 'B' : 'b';
+    var queen = white ? 'Q' : 'q';
+    for (i = 0; i < 4; i++) {
       var dir = BISHOP_DIRS[i];
       var sq = square;
       while (true) {
-        var next = sq + dir;
+        next = sq + dir;
         if (next < 0 || next > 63) break;
-        if (Math.abs(fileOf(next) - fileOf(sq)) !== 1) break; // wrapped
+        nf = next & 7;
+        prevf = sq & 7;
+        if (nf - prevf > 1 || prevf - nf > 1) break; // wrapped
         p = board[next];
         if (p !== null) {
           if (p === bishop || p === queen) return true;
@@ -222,20 +262,21 @@
       }
     }
     // Sliding: rook/queen on ranks & files.
-    for (i = 0; i < ROOK_DIRS.length; i++) {
+    var rook = white ? 'R' : 'r';
+    for (i = 0; i < 4; i++) {
       var rdir = ROOK_DIRS[i];
       var rsq = square;
+      var horiz = rdir === 1 || rdir === -1;
       while (true) {
-        var rnext = rsq + rdir;
-        if (rnext < 0 || rnext > 63) break;
-        // horizontal moves must stay on same rank
-        if ((rdir === 1 || rdir === -1) && rankOf(rnext) !== rankOf(rsq)) break;
-        p = board[rnext];
+        next = rsq + rdir;
+        if (next < 0 || next > 63) break;
+        if (horiz && (next >> 3) !== (rsq >> 3)) break; // stay on rank
+        p = board[next];
         if (p !== null) {
           if (p === rook || p === queen) return true;
           break;
         }
-        rsq = rnext;
+        rsq = next;
       }
     }
 
@@ -418,6 +459,7 @@
       halfmoves: this.halfmoves,
       fullmoves: this.fullmoves,
       turn: this.turn,
+      hash: this.hash,
     };
 
     var color = this.turn;
@@ -481,6 +523,38 @@
     if (color === BLACK) this.fullmoves++;
     this.turn = color === WHITE ? BLACK : WHITE;
 
+    // ---- Incremental Zobrist hash update ----
+    var h = undo.hash;
+    var arriving = move.promotion ? move.promotion : piece;
+    h ^= ZOB.pieces[piece][move.from]; // moving piece leaves origin
+    h ^= ZOB.pieces[arriving][move.to]; // (possibly promoted) piece arrives
+    if (move.captured) {
+      if (move.flags.indexOf('e') !== -1) {
+        var epCap = color === WHITE ? move.to + 8 : move.to - 8;
+        h ^= ZOB.pieces[move.captured][epCap];
+      } else {
+        h ^= ZOB.pieces[move.captured][move.to];
+      }
+    }
+    if (move.flags.indexOf('k') !== -1) {
+      if (color === WHITE) { h ^= ZOB.pieces.R[63]; h ^= ZOB.pieces.R[61]; }
+      else { h ^= ZOB.pieces.r[7]; h ^= ZOB.pieces.r[5]; }
+    } else if (move.flags.indexOf('q') !== -1) {
+      if (color === WHITE) { h ^= ZOB.pieces.R[56]; h ^= ZOB.pieces.R[59]; }
+      else { h ^= ZOB.pieces.r[0]; h ^= ZOB.pieces.r[3]; }
+    }
+    // Castling-right changes (rights only ever go true -> false).
+    if (undo.castling.K && !this.castling.K) h ^= ZOB.castling.K;
+    if (undo.castling.Q && !this.castling.Q) h ^= ZOB.castling.Q;
+    if (undo.castling.k && !this.castling.k) h ^= ZOB.castling.k;
+    if (undo.castling.q && !this.castling.q) h ^= ZOB.castling.q;
+    // En-passant file changes.
+    if (undo.epSquare !== null) h ^= ZOB.ep[fileOf(undo.epSquare)];
+    if (this.epSquare !== null) h ^= ZOB.ep[fileOf(this.epSquare)];
+    // Side to move toggles every move.
+    h ^= ZOB.side;
+    this.hash = h >>> 0;
+
     return undo;
   };
 
@@ -494,6 +568,7 @@
     this.halfmoves = undo.halfmoves;
     this.fullmoves = undo.fullmoves;
     this.turn = undo.turn;
+    this.hash = undo.hash;
 
     // restore moved piece
     board[move.from] = move.promotion ? (color === WHITE ? 'P' : 'p') : board[move.to];
@@ -526,14 +601,20 @@
   };
 
   // Legal moves: pseudo moves filtered so the mover's king is not in check.
+  // The king square is found once up front; after a move it only differs when
+  // the king itself moved (then it is the move's destination). This avoids a
+  // full-board king scan for every pseudo move — a major search speedup.
   Chess.prototype.generateLegalMoves = function (color) {
     color = color || this.turn;
     var pseudo = this.generatePseudoMoves(color);
     var legal = [];
+    var enemy = color === WHITE ? BLACK : WHITE;
+    var kingSq = this.kingIndex(color);
     for (var i = 0; i < pseudo.length; i++) {
       var m = pseudo[i];
       var undo = this._makeMove(m);
-      if (!this.isSquareAttacked(this.kingIndex(color), color === WHITE ? BLACK : WHITE)) {
+      var ks = typeOf(m.piece) === 'k' ? m.to : kingSq;
+      if (!this.isSquareAttacked(ks, enemy)) {
         legal.push(m);
       }
       this._undoMove(undo);

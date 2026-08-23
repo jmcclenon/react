@@ -67,12 +67,15 @@
   var profile = loadProfile();
 
   function loadProfile() {
-    var def = {rating: STARTING_RATING, games: 0, wins: 0, losses: 0, draws: 0, rated: 0, history: []};
+    var def = {name: '', nickname: '', joined: Date.now(), rating: STARTING_RATING, games: 0, wins: 0, losses: 0, draws: 0, rated: 0, history: []};
     try {
       var raw = localStorage.getItem(RATING_KEY);
       if (raw) {
         var p = JSON.parse(raw);
         return {
+          name: p.name || '',
+          nickname: p.nickname || '',
+          joined: p.joined || Date.now(),
           rating: typeof p.rating === 'number' ? p.rating : STARTING_RATING,
           games: p.games || 0,
           wins: p.wins || 0,
@@ -312,9 +315,48 @@
   }
 
   function resetRating() {
-    profile = {rating: STARTING_RATING, games: 0, wins: 0, losses: 0, draws: 0, rated: 0, history: []};
+    // Keep the player's identity; only reset the rating/record/history.
+    profile.rating = STARTING_RATING;
+    profile.games = 0;
+    profile.wins = 0;
+    profile.losses = 0;
+    profile.draws = 0;
+    profile.rated = 0;
+    profile.history = [];
     saveProfile();
     renderRating();
+  }
+
+  // ---- Player profile ---------------------------------------------------
+  function humanName() {
+    return profile.nickname || profile.name || 'You';
+  }
+
+  function renderProfile() {
+    var name = profile.name || 'Guest Player';
+    $('profileName').textContent = name;
+    $('profileNick').textContent = profile.nickname ? '“' + profile.nickname + '”' : '';
+    var d = new Date(profile.joined);
+    $('profileJoined').textContent = 'Member since ' + d.toLocaleDateString(undefined, {year: 'numeric', month: 'short', day: 'numeric'});
+    var initialsSrc = (profile.nickname || profile.name || '?').trim();
+    $('avatar').textContent = initialsSrc.charAt(0) || '?';
+  }
+
+  function openProfileForm() {
+    $('pfName').value = profile.name || '';
+    $('pfNick').value = profile.nickname || '';
+    $('profileForm').classList.remove('hidden');
+  }
+  function closeProfileForm() {
+    $('profileForm').classList.add('hidden');
+  }
+  function saveProfileForm() {
+    profile.name = $('pfName').value.trim().slice(0, 40);
+    profile.nickname = $('pfNick').value.trim().slice(0, 24);
+    saveProfile();
+    renderProfile();
+    closeProfileForm();
+    render(); // refresh the on-board name
   }
 
   // ---- DOM refs ---------------------------------------------------------
@@ -332,6 +374,7 @@
     updateOpeningBookVisibility();
     buildBoardCells();
     bindControls();
+    renderProfile();
     renderRating();
     renderSavedGames();
     newGame();
@@ -548,6 +591,9 @@
     $('resetRating').addEventListener('click', function () {
       resetRating();
     });
+    $('editProfile').addEventListener('click', openProfileForm);
+    $('saveProfile').addEventListener('click', saveProfileForm);
+    $('cancelProfile').addEventListener('click', closeProfileForm);
     $('nextGame').addEventListener('click', startNextMatchGame);
     $('saveGame').addEventListener('click', saveCurrentGame);
     $('undoMove').addEventListener('click', undoMove);
@@ -1028,8 +1074,8 @@
 
     $('bottomDot').className = 'dot ' + (bottomColor === 'w' ? 'white' : 'black');
     $('topDot').className = 'dot ' + (topColor === 'w' ? 'white' : 'black');
-    $('bottomName').textContent = bottomColor === state.humanColor ? 'You' : aiName();
-    $('topName').textContent = topColor === state.humanColor ? 'You' : aiName();
+    $('bottomName').textContent = bottomColor === state.humanColor ? humanName() : aiName();
+    $('topName').textContent = topColor === state.humanColor ? humanName() : aiName();
 
     var caps = capturedPieces();
     // captured shown next to the capturer
@@ -1201,12 +1247,21 @@
 
   function classifyRecorded(rec, pre, isHuman) {
     var quality;
-    var found = findRanked(pre, rec);
-    if (found) {
-      var cpLoss = pre.ranked[0].score - found.entry.score;
-      quality = state.coach.classifyLoss(cpLoss, found.rank === 0);
+    var plyIndex0 = state.records.indexOf(rec);
+    // A move that keeps the game in known opening theory is a "Book" move — a
+    // shallow analyzer shouldn't flag principled book moves as inaccuracies.
+    var sansThrough = state.records.slice(0, plyIndex0 + 1).map(function (r) { return r.san; });
+    var inBook = window.ChessOpenings.lookup(sansThrough).inBook;
+    if (inBook) {
+      quality = {label: 'Book', type: 'book', cp: 0};
     } else {
-      quality = {label: 'Good', type: 'good', cp: 0};
+      var found = findRanked(pre, rec);
+      if (found) {
+        var cpLoss = pre.ranked[0].score - found.entry.score;
+        quality = state.coach.classifyLoss(cpLoss, found.rank === 0);
+      } else {
+        quality = {label: 'Good', type: 'good', cp: 0};
+      }
     }
     var plyIndex = state.records.indexOf(rec);
     if (plyIndex >= 0) state.records[plyIndex].quality = quality;
@@ -1295,7 +1350,7 @@
         }
         return;
       }
-      var res = state.analyzer.analyze(g, 3);
+      var res = state.analyzer.analyze(g, 4);
       if (!res) return;
       state.lastEvalWhite = res.whiteScore;
       state.preMoveAnalysis = res;
@@ -1344,6 +1399,9 @@
       addCoachMessage('warn', 'Inaccuracy', 'A slightly better move was available. ' + suggestBetter());
     } else if (qType === 'best') {
       addCoachMessage('good', 'Best move', 'That\'s the engine\'s top choice — excellent.');
+    } else if (qType === 'book') {
+      var lib = window.ChessOpenings.lookup(state.records.slice(0, state.viewPly).map(function (r) { return r.san; })).opening;
+      addCoachMessage('good', 'Book move', lib ? 'A known theoretical move — this is the ' + lib.name + '.' : 'A recognized opening move.');
     }
 
     // Principle-based tips
@@ -1472,7 +1530,7 @@
   function showHint() {
     if (state.gameOver || state.aiThinking || !isLiveView()) return;
     if (state.game.turn !== state.humanColor) return;
-    var res = state.preMoveAnalysis || state.analyzer.analyze(state.game, 3);
+    var res = state.preMoveAnalysis || state.analyzer.analyze(state.game, 4);
     if (res && res.bestMove) {
       markAssisted(); // using a hint makes the game Casual (unrated)
       state.hint = {from: res.bestMove.from, to: res.bestMove.to};
@@ -1510,16 +1568,21 @@
     td.className = 'mv';
     if (state.viewPly === plyNumber) td.classList.add('current');
     td.textContent = rec.san;
-    if (rec.quality && rec.quality.type !== 'good' && rec.quality.type !== 'best') {
+    if (rec.quality && (rec.quality.type === 'inaccuracy' || rec.quality.type === 'mistake' || rec.quality.type === 'blunder')) {
       var q = document.createElement('span');
       q.className = 'q ' + rec.quality.type;
-      q.textContent = rec.quality.type === 'inaccuracy' ? '?!' : rec.quality.type === 'mistake' ? '?' : rec.quality.type === 'blunder' ? '??' : '';
+      q.textContent = rec.quality.type === 'inaccuracy' ? '?!' : rec.quality.type === 'mistake' ? '?' : '??';
       td.appendChild(q);
     } else if (rec.quality && rec.quality.type === 'best') {
       var qb = document.createElement('span');
       qb.className = 'q best';
       qb.textContent = '!';
       td.appendChild(qb);
+    } else if (rec.quality && rec.quality.type === 'book') {
+      var qk = document.createElement('span');
+      qk.className = 'q book';
+      qk.textContent = '📖';
+      td.appendChild(qk);
     }
     td.addEventListener('click', function () {
       navTo(plyNumber);

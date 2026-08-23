@@ -24,7 +24,29 @@
       <!-- LEFT: settings & controls -->
       <aside>
         <section class="panel rating-panel">
-          <h2>Your Rating</h2>
+          <h2>Player Profile</h2>
+          <div class="profile-head">
+            <div class="avatar" id="avatar">?</div>
+            <div class="profile-id">
+              <div class="profile-name" id="profileName">Guest Player</div>
+              <div class="profile-nick" id="profileNick"></div>
+              <div class="profile-joined" id="profileJoined"></div>
+            </div>
+            <button class="btn profile-edit-btn" id="editProfile">Edit</button>
+          </div>
+          <div class="profile-form hidden" id="profileForm">
+            <label class="field" for="pfName">Name</label>
+            <input type="text" id="pfName" maxlength="40" placeholder="Your name" />
+            <label class="field" for="pfNick">Nickname</label>
+            <input type="text" id="pfNick" maxlength="24" placeholder="Shown on the board" />
+            <div class="control-row" style="margin-top: 10px">
+              <button class="btn primary" id="saveProfile">Save</button>
+              <button class="btn" id="cancelProfile">Cancel</button>
+            </div>
+          </div>
+
+          <div class="profile-divider"></div>
+
           <div class="rating-top">
             <div class="rating-value" id="ratingValue">1000</div>
             <div class="rating-record">

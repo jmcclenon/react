@@ -128,58 +128,128 @@
   // Tropism weight per piece type when measuring pressure on the enemy king.
   var TROPISM = {n: 2, b: 2, r: 3, q: 5, p: 0, k: 0};
 
+  // Reusable scratch buffers for evaluate() so it allocates nothing per call
+  // (evaluate is the single hottest function in the search). Not reentrant,
+  // which is fine — the search is single-threaded and never nests eval calls.
+  var _wpf = new Int8Array(8), _bpf = new Int8Array(8);
+  var _wpMin = new Int8Array(8), _wpMax = new Int8Array(8);
+  var _bpMin = new Int8Array(8), _bpMax = new Int8Array(8);
+
   // Static evaluation from White's perspective (positive = White better).
-  // An optional `style` reshapes the same position into a personality:
+  // Combines material + piece-square tables with pawn structure (doubled,
+  // isolated, passed), rook files, king safety, a small mobility/tempo term and
+  // the bishop pair. An optional `style` reshapes it into a personality:
   //   material — multiplier on the raw material+PST balance
+  //   position — multiplier on the positional terms
   //   attack   — weight on piece pressure toward the enemy king (both sides),
-  //              so an aggressive engine will sacrifice material for an attack
-  //   position — multiplier on positional bonuses (bishop pair, etc.)
+  //              so an aggressive engine will sacrifice material for an attack.
   function evaluate(chess, style) {
     var board = chess.board;
-    var base = 0; // material + piece-square tables
-    var positional = 0; // style-scalable positional bonuses
-    var endgame = isEndgame(board);
-    var i, p, t, c;
+    var base = 0; // material + piece-square tables (kings added after phase known)
+    var positional = 0; // structure, king safety, rook files, bishop pair
+    var i, p, t, f, r;
+    var wb = 0, bb = 0, wk = -1, bk = -1;
+    var queens = 0, majorMinor = 0;
+
+    _wpf.fill(0); _bpf.fill(0);
+    _wpMin.fill(8); _wpMax.fill(-1); _bpMin.fill(8); _bpMax.fill(-1);
 
     for (i = 0; i < 64; i++) {
       p = board[i];
       if (p === null) continue;
-      t = typeOf(p);
-      c = colorOf(p);
-      var val = PIECE_VALUE[t];
-      var table = t === 'k' ? (endgame ? PST.kEnd : PST.k) : PST[t];
-      if (c === 'w') base += val + table[i];
-      else base -= val + table[mirror(i)];
+      f = i & 7; r = i >> 3;
+      if (p < 'a') { // white piece (uppercase)
+        switch (p) {
+          case 'P': base += 100 + PST.p[i]; _wpf[f]++; if (r < _wpMin[f]) _wpMin[f] = r; if (r > _wpMax[f]) _wpMax[f] = r; break;
+          case 'N': base += 320 + PST.n[i]; majorMinor++; break;
+          case 'B': base += 330 + PST.b[i]; wb++; majorMinor++; break;
+          case 'R': base += 500 + PST.r[i]; majorMinor++; break;
+          case 'Q': base += 900 + PST.q[i]; queens++; break;
+          case 'K': wk = i; break;
+        }
+      } else { // black piece (lowercase)
+        var mi = ((7 - r) << 3) + f; // mirror index
+        switch (p) {
+          case 'p': base -= 100 + PST.p[mi]; _bpf[f]++; if (r < _bpMin[f]) _bpMin[f] = r; if (r > _bpMax[f]) _bpMax[f] = r; break;
+          case 'n': base -= 320 + PST.n[mi]; majorMinor++; break;
+          case 'b': base -= 330 + PST.b[mi]; bb++; majorMinor++; break;
+          case 'r': base -= 500 + PST.r[mi]; majorMinor++; break;
+          case 'q': base -= 900 + PST.q[mi]; queens++; break;
+          case 'k': bk = i; break;
+        }
+      }
     }
 
-    // Bishop pair bonus (a positional consideration).
-    var wb = 0, bb = 0;
-    for (i = 0; i < 64; i++) {
-      if (board[i] === 'B') wb++;
-      else if (board[i] === 'b') bb++;
-    }
+    var endgame = queens === 0 || (queens <= 2 && majorMinor <= 2);
+    if (wk >= 0) base += (endgame ? PST.kEnd : PST.k)[wk];
+    if (bk >= 0) base -= (endgame ? PST.kEnd : PST.k)[((7 - (bk >> 3)) << 3) + (bk & 7)];
+
     if (wb >= 2) positional += 30;
     if (bb >= 2) positional -= 30;
 
-    if (!style) return base + positional;
+    // Pawn structure: doubled, isolated, passed (all from the file tables).
+    for (f = 0; f < 8; f++) {
+      if (_wpf[f] > 1) positional -= 12 * (_wpf[f] - 1);
+      if (_bpf[f] > 1) positional += 12 * (_bpf[f] - 1);
+      if (_wpf[f] > 0 && (f === 0 || _wpf[f - 1] === 0) && (f === 7 || _wpf[f + 1] === 0)) positional -= 14 * _wpf[f];
+      if (_bpf[f] > 0 && (f === 0 || _bpf[f - 1] === 0) && (f === 7 || _bpf[f + 1] === 0)) positional += 14 * _bpf[f];
+      // White passed pawn (its most advanced pawn on this file).
+      if (_wpf[f] > 0) {
+        var wr = _wpMin[f]; // smaller rank = more advanced for White
+        var lf = f === 0 ? 8 : _bpMin[f - 1], mf = _bpMin[f], rf2 = f === 7 ? 8 : _bpMin[f + 1];
+        if (lf >= wr && mf >= wr && rf2 >= wr) positional += 12 + (6 - wr) * 8;
+      }
+      // Black passed pawn.
+      if (_bpf[f] > 0) {
+        var br = _bpMax[f]; // larger rank = more advanced for Black
+        var lfb = f === 0 ? -1 : _wpMax[f - 1], mfb = _wpMax[f], rfb = f === 7 ? -1 : _wpMax[f + 1];
+        if (lfb <= br && mfb <= br && rfb <= br) positional -= 12 + (br - 1) * 8;
+      }
+    }
+
+    // Rooks on open / semi-open files.
+    for (i = 0; i < 64; i++) {
+      p = board[i];
+      if (p === 'R') { f = i & 7; if (_wpf[f] === 0) positional += _bpf[f] === 0 ? 20 : 10; }
+      else if (p === 'r') { f = i & 7; if (_bpf[f] === 0) positional -= _wpf[f] === 0 ? 20 : 10; }
+    }
+
+    // King safety: pawn shield on the king's file and neighbours (middlegame).
+    if (!endgame) {
+      if (wk >= 0) {
+        var wkf = wk & 7, wsh = 0;
+        if (wkf > 0) wsh += _wpf[wkf - 1] > 0 ? 1 : -1;
+        wsh += _wpf[wkf] > 0 ? 1 : -1;
+        if (wkf < 7) wsh += _wpf[wkf + 1] > 0 ? 1 : -1;
+        positional += wsh * 10;
+      }
+      if (bk >= 0) {
+        var bkf = bk & 7, bsh = 0;
+        if (bkf > 0) bsh += _bpf[bkf - 1] > 0 ? 1 : -1;
+        bsh += _bpf[bkf] > 0 ? 1 : -1;
+        if (bkf < 7) bsh += _bpf[bkf + 1] > 0 ? 1 : -1;
+        positional -= bsh * 10;
+      }
+    }
+
+    // Small tempo bonus for the side to move.
+    var tempo = chess.turn === 'w' ? 10 : -10;
+
+    if (!style) return base + positional + tempo;
 
     var matMul = style.material == null ? 1 : style.material;
     var posMul = style.position == null ? 1 : style.position;
     var attackW = style.attack || 0;
+    var score = base * matMul + positional * posMul + tempo;
 
-    var score = base * matMul + positional * posMul;
-
-    if (attackW !== 0) {
-      var wk = chess.kingIndex('w');
-      var bk = chess.kingIndex('b');
+    if (attackW !== 0 && wk >= 0 && bk >= 0) {
       var whiteAttack = 0, blackAttack = 0;
       for (i = 0; i < 64; i++) {
         p = board[i];
         if (p === null) continue;
         t = typeOf(p);
         if (t === 'k' || t === 'p') continue;
-        c = colorOf(p);
-        if (c === 'w') whiteAttack += (7 - chebyshev(i, bk)) * TROPISM[t];
+        if (colorOf(p) === 'w') whiteAttack += (7 - chebyshev(i, bk)) * TROPISM[t];
         else blackAttack += (7 - chebyshev(i, wk)) * TROPISM[t];
       }
       score += attackW * (whiteAttack - blackAttack);
@@ -309,12 +379,12 @@
   //   noise      — centipawn randomness added to evaluation to make lower
   //                levels imperfect and less repetitive.
   AI.LEVELS = [
-    {name: 'Beginner', elo: 600, maxDepth: 1, timeMs: 300, blunderChance: 0.35, noise: 90, quiescence: false},
-    {name: 'Casual', elo: 1000, maxDepth: 2, timeMs: 500, blunderChance: 0.18, noise: 55, quiescence: false},
-    {name: 'Intermediate', elo: 1400, maxDepth: 3, timeMs: 800, blunderChance: 0.08, noise: 30, quiescence: true},
-    {name: 'Advanced', elo: 1800, maxDepth: 4, timeMs: 1200, blunderChance: 0.03, noise: 12, quiescence: true},
-    {name: 'Expert', elo: 2100, maxDepth: 5, timeMs: 2000, blunderChance: 0.0, noise: 4, quiescence: true},
-    {name: 'Grandmaster', elo: 2500, maxDepth: 7, timeMs: 3000, blunderChance: 0.0, noise: 0, quiescence: true},
+    {name: 'Beginner', elo: 600, maxDepth: 2, timeMs: 200, blunderChance: 0.33, noise: 90, quiescence: false},
+    {name: 'Casual', elo: 1000, maxDepth: 3, timeMs: 400, blunderChance: 0.15, noise: 55, quiescence: false},
+    {name: 'Intermediate', elo: 1400, maxDepth: 4, timeMs: 700, blunderChance: 0.06, noise: 28, quiescence: true},
+    {name: 'Advanced', elo: 1800, maxDepth: 6, timeMs: 1300, blunderChance: 0.015, noise: 12, quiescence: true},
+    {name: 'Expert', elo: 2100, maxDepth: 8, timeMs: 2200, blunderChance: 0.0, noise: 4, quiescence: true},
+    {name: 'Grandmaster', elo: 2500, maxDepth: 12, timeMs: 3000, blunderChance: 0.0, noise: 0, quiescence: true},
   ];
 
   AI.prototype.setLevel = function (level) {
@@ -400,38 +470,49 @@
     return null;
   };
 
-  // Order moves to improve alpha-beta pruning: captures first (MVV-LVA),
-  // then promotions, then quiet moves.
-  function scoreMove(move) {
-    var s = 0;
-    if (move.captured) {
-      s += 10 * PIECE_VALUE[typeOf(move.captured)] - PIECE_VALUE[typeOf(move.piece)];
-    }
-    if (move.promotion) s += PIECE_VALUE[typeOf(move.promotion)];
-    return s;
+  function other(c) {
+    return c === 'w' ? 'b' : 'w';
+  }
+  function sameMove(m, k) {
+    return !!k && m.from === k.from && m.to === k.to && (m.promotion || null) === (k.promotion || null);
   }
 
-  function orderMoves(moves) {
-    return moves
-      .map(function (m) {
-        return {m: m, s: scoreMove(m)};
-      })
-      .sort(function (a, b) {
-        return b.s - a.s;
-      })
-      .map(function (x) {
-        return x.m;
-      });
-  }
+  var TT_EXACT = 0, TT_LOWER = 1, TT_UPPER = 2;
 
   AI.prototype.checkTime = function () {
-    if ((this.nodes & 2047) === 0 && Date.now() >= this.deadline) {
+    if ((this.nodes & 1023) === 0 && Date.now() >= this.deadline) {
       this.timedOut = true;
     }
     return this.timedOut;
   };
 
-  // Quiescence search: only extend captures to reach a "quiet" position.
+  // Order moves in place: transposition-table move, then captures (MVV-LVA),
+  // promotions, killer moves, and finally by the history heuristic.
+  AI.prototype.orderMoves = function (moves, ttMove, ply) {
+    var hist = this.hist;
+    var killers = this.killers[ply];
+    for (var i = 0; i < moves.length; i++) {
+      var m = moves[i], s = 0;
+      if (ttMove && sameMove(m, ttMove)) s = 2e9;
+      else if (m.captured) s = 1e6 + 10 * PIECE_VALUE[typeOf(m.captured)] - PIECE_VALUE[typeOf(m.piece)];
+      else if (m.promotion) s = 9e5 + PIECE_VALUE[typeOf(m.promotion)];
+      else if (killers && sameMove(m, killers[0])) s = 8e5;
+      else if (killers && sameMove(m, killers[1])) s = 7.9e5;
+      else s = hist[m.from * 64 + m.to] || 0;
+      m._o = s;
+    }
+    moves.sort(function (a, b) { return b._o - a._o; });
+  };
+
+  AI.prototype.addKiller = function (ply, m) {
+    var k = this.killers[ply] || (this.killers[ply] = [null, null]);
+    if (sameMove(m, k[0])) return;
+    k[1] = k[0];
+    k[0] = {from: m.from, to: m.to, promotion: m.promotion};
+  };
+
+  // Quiescence search: only extend captures/promotions to reach a "quiet"
+  // position, so the evaluation isn't taken in the middle of a trade.
   AI.prototype.quiescence = function (chess, alpha, beta, color) {
     this.nodes++;
     if (this.checkTime()) return color === 'w' ? evaluate(chess, this.style) : -evaluate(chess, this.style);
@@ -439,57 +520,117 @@
     if (standPat >= beta) return beta;
     if (alpha < standPat) alpha = standPat;
 
-    var moves = chess.generateLegalMoves();
-    var captures = orderMoves(
-      moves.filter(function (m) {
-        return m.captured || m.promotion;
-      })
-    );
-    for (var i = 0; i < captures.length; i++) {
-      var undo = chess._makeMove(captures[i]);
-      var score = -this.quiescence(chess, -beta, -alpha, color === 'w' ? 'b' : 'w');
+    // Pseudo-legal captures/promotions only, with lazy legality checking.
+    var moves = chess.generatePseudoMoves(color);
+    var caps = [];
+    for (var k = 0; k < moves.length; k++) {
+      if (moves[k].captured || moves[k].promotion) caps.push(moves[k]);
+    }
+    this.orderMoves(caps, null, 0);
+    var enemy = other(color);
+    var kingBefore = chess.kingIndex(color);
+    for (var i = 0; i < caps.length; i++) {
+      var m = caps[i];
+      var undo = chess._makeMove(m);
+      var ks = typeOf(m.piece) === 'k' ? m.to : kingBefore;
+      if (chess.isSquareAttacked(ks, enemy)) { chess._undoMove(undo); continue; }
+      var score = -this.quiescence(chess, -beta, -alpha, enemy);
       chess._undoMove(undo);
+      if (this.timedOut) return alpha;
       if (score >= beta) return beta;
       if (score > alpha) alpha = score;
     }
     return alpha;
   };
 
-  // Negamax with alpha-beta. Returns score from the perspective of `color`.
-  AI.prototype.negamax = function (chess, depth, alpha, beta, color) {
+  // Negamax with alpha-beta, a transposition table, principal-variation search,
+  // and killer/history move ordering. `ply` is the distance from the root (used
+  // for mate-distance scoring and killer indexing).
+  AI.prototype.negamax = function (chess, depth, alpha, beta, color, ply) {
     this.nodes++;
     if (this.checkTime()) return alpha;
-    var moves = chess.generateLegalMoves();
 
-    if (moves.length === 0) {
-      if (chess.isCheck()) return -MATE - depth; // prefer faster mates
-      return 0; // stalemate
-    }
-    if (depth === 0) {
-      if (this.level.quiescence) {
-        return this.quiescence(chess, alpha, beta, color);
+    var alphaOrig = alpha;
+    var key = chess.hash;
+    var tt = this.tt.get(key);
+    var ttMove = null;
+    if (tt) {
+      ttMove = tt.move;
+      if (tt.depth >= depth) {
+        var s = tt.score;
+        if (s > MATE - 1000) s -= ply; else if (s < -(MATE - 1000)) s += ply;
+        if (tt.flag === TT_EXACT) return s;
+        if (tt.flag === TT_LOWER && s >= beta) return s;
+        if (tt.flag === TT_UPPER && s <= alpha) return s;
       }
+    }
+
+    if (depth <= 0) {
+      if (this.level.quiescence) return this.quiescence(chess, alpha, beta, color);
       return color === 'w' ? evaluate(chess, this.style) : -evaluate(chess, this.style);
     }
 
-    moves = orderMoves(moves);
-    var best = -Infinity;
+    // Pseudo-legal moves, ordered; legality is verified lazily below so a beta
+    // cutoff avoids checking the legality of moves we never search.
+    var moves = chess.generatePseudoMoves(color);
+    this.orderMoves(moves, ttMove, ply);
+    var enemy = other(color);
+    var kingBefore = chess.kingIndex(color);
+
+    var best = -Infinity, bestMove = null, legal = 0;
     for (var i = 0; i < moves.length; i++) {
-      var undo = chess._makeMove(moves[i]);
-      var score = -this.negamax(chess, depth - 1, -beta, -alpha, color === 'w' ? 'b' : 'w');
+      var m = moves[i];
+      var undo = chess._makeMove(m);
+      var ks = typeOf(m.piece) === 'k' ? m.to : kingBefore;
+      if (chess.isSquareAttacked(ks, enemy)) { // move leaves own king in check
+        chess._undoMove(undo);
+        continue;
+      }
+      legal++;
+      var score;
+      if (legal === 1) {
+        score = -this.negamax(chess, depth - 1, -beta, -alpha, enemy, ply + 1);
+      } else {
+        // PVS: search later moves with a null window, re-search if promising.
+        score = -this.negamax(chess, depth - 1, -alpha - 1, -alpha, enemy, ply + 1);
+        if (score > alpha && score < beta && !this.timedOut) {
+          score = -this.negamax(chess, depth - 1, -beta, -alpha, enemy, ply + 1);
+        }
+      }
       chess._undoMove(undo);
-      if (score > best) best = score;
+      if (this.timedOut) return best > -Infinity ? best : alpha;
+      if (score > best) { best = score; bestMove = m; }
       if (best > alpha) alpha = best;
-      if (alpha >= beta) break; // beta cutoff
+      if (alpha >= beta) {
+        if (!m.captured && !m.promotion) {
+          this.addKiller(ply, m);
+          this.hist[m.from * 64 + m.to] += depth * depth;
+        }
+        break;
+      }
     }
+
+    if (legal === 0) { // no legal moves: checkmate or stalemate
+      return chess.isSquareAttacked(kingBefore, enemy) ? -(MATE - ply) : 0;
+    }
+
+    // Store in the transposition table (with mate-distance-relative score).
+    var flag = best <= alphaOrig ? TT_UPPER : best >= beta ? TT_LOWER : TT_EXACT;
+    var storeScore = best;
+    if (storeScore > MATE - 1000) storeScore += ply; else if (storeScore < -(MATE - 1000)) storeScore -= ply;
+    if (this.tt.size > 700000) this.tt.clear();
+    this.tt.set(key, {
+      depth: depth, flag: flag, score: storeScore,
+      move: bestMove ? {from: bestMove.from, to: bestMove.to, promotion: bestMove.promotion} : null,
+    });
     return best;
   };
 
   // Search the root position with iterative deepening under a time budget.
   // Options: {maxDepth, timeMs, noise}. Returns the best move, its score, a
-  // ranked list of root moves, and node/depth stats. Because each iteration
-  // reorders the root by the previous scores, alpha-beta prunes far better and
-  // the move returned on a timeout is still the best from the last full depth.
+  // ranked list of root moves, and node stats. The TT and previous-iteration
+  // ordering make each deeper pass fast and the move returned on timeout the
+  // best from the last fully-searched depth.
   AI.prototype.search = function (chess, opts) {
     opts = opts || {};
     var maxDepth = opts.maxDepth != null ? opts.maxDepth : this.level.maxDepth;
@@ -499,16 +640,16 @@
     this.nodes = 0;
     this.timedOut = false;
     this.deadline = timeMs > 0 ? Date.now() + timeMs : Infinity;
+    this.tt = new Map();
+    this.hist = new Int32Array(64 * 64);
+    this.killers = [];
 
     var color = chess.turn;
-    var rootMoves = orderMoves(chess.generateLegalMoves());
+    var enemy = other(color);
+    var rootMoves = chess.generateLegalMoves();
     if (rootMoves.length === 0) return null;
 
-    var enemy = color === 'w' ? 'b' : 'w';
-    // Best complete result from the last fully-searched depth.
-    var completed = rootMoves.map(function (m) {
-      return {move: m, score: 0};
-    });
+    var completed = rootMoves.map(function (m) { return {move: m, score: 0}; });
 
     for (var depth = 1; depth <= maxDepth; depth++) {
       var iter = [];
@@ -518,29 +659,29 @@
 
       for (var i = 0; i < rootMoves.length; i++) {
         var undo = chess._makeMove(rootMoves[i]);
-        var score = -this.negamax(chess, depth - 1, -beta, -alpha, enemy);
-        chess._undoMove(undo);
-        if (this.timedOut) {
-          aborted = true;
-          break;
+        var score;
+        if (i === 0) {
+          score = -this.negamax(chess, depth - 1, -beta, -alpha, enemy, 1);
+        } else {
+          score = -this.negamax(chess, depth - 1, -alpha - 1, -alpha, enemy, 1);
+          if (score > alpha && !this.timedOut) {
+            score = -this.negamax(chess, depth - 1, -beta, -alpha, enemy, 1);
+          }
         }
+        chess._undoMove(undo);
+        if (this.timedOut) { aborted = true; break; }
         iter.push({move: rootMoves[i], score: score});
         if (score > alpha) alpha = score;
       }
 
       if (aborted) break; // keep the previous depth's complete result
 
-      iter.sort(function (a, b) {
-        return b.score - a.score;
-      });
+      iter.sort(function (a, b) { return b.score - a.score; });
       completed = iter;
-      // Order next iteration by this depth's scores (best first) for pruning.
-      rootMoves = iter.map(function (x) {
-        return x.move;
-      });
+      rootMoves = iter.map(function (x) { return x.move; });
+      this.lastDepth = depth;
 
-      // Early exit on a forced mate.
-      if (Math.abs(completed[0].score) > MATE - 1000) break;
+      if (Math.abs(completed[0].score) > MATE - 1000) break; // forced mate found
       if (this.timedOut) break;
     }
 
@@ -550,44 +691,79 @@
       ranked = ranked.map(function (r) {
         return {move: r.move, score: r.score + Math.floor((Math.random() * 2 - 1) * noise)};
       });
-      ranked.sort(function (a, b) {
-        return b.score - a.score;
-      });
+      ranked.sort(function (a, b) { return b.score - a.score; });
     }
 
-    return {
-      best: ranked[0].move,
-      score: ranked[0].score,
-      ranked: ranked,
-      nodes: this.nodes,
-    };
+    return {best: ranked[0].move, score: ranked[0].score, ranked: ranked, nodes: this.nodes};
   };
 
-  // Choose a move for the AI to play, honoring the level's blunder chance.
-  // Pick a move from this persona's opening repertoire, if one applies to the
-  // current position. `sanHistory` is the list of SAN moves played so far.
-  AI.prototype.repertoireMove = function (chess, sanHistory) {
-    if (!this.style || !sanHistory) return null;
-    var rep = REPERTOIRE[this.style.key];
-    if (!rep) return null;
-    if (sanHistory.length > 8) return null; // repertoire only covers the opening
-    var cands = rep[sanHistory.join(' ')];
-    if (!cands || cands.length === 0) return null;
+  // ---- Opening book (shared, built from the opening library) ------------
+  var BOOK = null;
+  function getBook() {
+    if (BOOK) return BOOK;
+    BOOK = {};
+    var CO = global.ChessOpenings;
+    if (!CO) return BOOK;
+    function add(moves) {
+      for (var i = 0; i < moves.length; i++) {
+        var key = moves.slice(0, i).join(' ');
+        (BOOK[key] || (BOOK[key] = [])).push(moves[i]);
+      }
+    }
+    CO.OPENINGS.forEach(function (o) { add(o.moves); });
+    CO.SPECIALIST.forEach(function (o) { add(o.moves); });
+    // Collapse duplicates into weighted candidates.
+    Object.keys(BOOK).forEach(function (key) {
+      var counts = {};
+      BOOK[key].forEach(function (san) { counts[san] = (counts[san] || 0) + 1; });
+      BOOK[key] = Object.keys(counts).map(function (san) { return {san: san, w: counts[san]}; });
+    });
+    return BOOK;
+  }
+
+  // Bias which opening families a style prefers (mainly the first move or two).
+  function styleBookWeight(style, san) {
+    if (!style) return 1;
+    var k = style.key;
+    if (k === 'aggressive' || k === 'tactical') {
+      if (san === 'e4') return 3;
+      if (san === 'f4') return k === 'tactical' ? 3 : 1.4;
+      if (san === 'd4' || san === 'c4' || san === 'Nf3') return 0.6;
+    } else if (k === 'positional' || k === 'defensive') {
+      if (san === 'd4' || san === 'c4') return 3;
+      if (san === 'Nf3') return 1.6;
+      if (san === 'e4') return 0.6;
+    }
+    return 1;
+  }
+
+  // Choose a book move (weighted by frequency and style) for the current
+  // position, or null if out of book.
+  AI.prototype.bookMove = function (chess, sanHistory) {
+    if (!sanHistory || sanHistory.length > 14) return null;
+    var book = getBook();
+    var cands = book[sanHistory.join(' ')];
+    if (!cands || !cands.length) return null;
 
     var legal = chess.generateLegalMoves();
-    var options = [];
-    for (var i = 0; i < cands.length; i++) {
+    var options = [], total = 0;
+    for (var ci = 0; ci < cands.length; ci++) {
       for (var j = 0; j < legal.length; j++) {
-        if (chess.toSan(legal[j]).replace(/[+#]$/, '') === cands[i]) {
-          options.push(legal[j]);
+        if (chess.toSan(legal[j]).replace(/[+#]$/, '') === cands[ci].san) {
+          var w = cands[ci].w * styleBookWeight(this.style, cands[ci].san);
+          options.push({move: legal[j], w: w});
+          total += w;
           break;
         }
       }
     }
-    if (options.length === 0) return null;
-    // Usually play the top choice; occasionally vary among the known replies.
-    if (options.length === 1 || Math.random() < 0.7) return options[0];
-    return options[Math.floor(Math.random() * options.length)];
+    if (!options.length) return null;
+    var r = Math.random() * total;
+    for (var oi = 0; oi < options.length; oi++) {
+      r -= options[oi].w;
+      if (r <= 0) return options[oi].move;
+    }
+    return options[0].move;
   };
 
   AI.prototype.chooseMove = function (chess, sanHistory) {
@@ -598,13 +774,12 @@
     var chosen = this.followChosenOpening(chess, sanHistory);
     if (chosen) return chosen;
 
-    // Opening book: play the persona's repertoire while it applies.
-    var book = this.repertoireMove(chess, sanHistory);
+    // Otherwise consult the shared opening book (varied, principled theory).
+    var book = this.bookMove(chess, sanHistory);
     if (book) return book;
 
     // Deliberate blunder: pick a random legal move (weak levels only).
     if (this.level.blunderChance > 0 && Math.random() < this.level.blunderChance) {
-      // Avoid hanging mate-in-one obviously; but keep it simple and human-like.
       return legal[Math.floor(Math.random() * legal.length)];
     }
 
