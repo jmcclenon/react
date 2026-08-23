@@ -328,6 +328,8 @@
   // ---- Init -------------------------------------------------------------
   function init() {
     populateOpponents();
+    populateOpeningBook();
+    updateOpeningBookVisibility();
     buildBoardCells();
     bindControls();
     renderRating();
@@ -411,6 +413,80 @@
         '<dt>Search</dt><dd>' + think + '</dd>' +
       '</dl>' +
       '<div class="sc-tell"><strong>How to beat it:</strong> ' + prof.weakness + '</div>';
+
+    // For specialists, show the opening book the player has selected.
+    if (state.ai.specialist) {
+      var spec = selectedSpecialistOpening();
+      if (spec) {
+        var side = spec.side === 'w' ? 'as White' : 'as Black';
+        var extra = document.createElement('div');
+        extra.className = 'sc-tell';
+        extra.style.background = 'rgba(124,165,255,.12)';
+        extra.style.borderLeftColor = 'var(--accent)';
+        extra.innerHTML = '<strong style="color:var(--accent)">Opening book:</strong> plays the <strong>' +
+          spec.name + '</strong> ' + side + ' by your choice, then plays on its own.';
+        host.appendChild(extra);
+      }
+    }
+  }
+
+  // The specialist opening currently chosen in the picker (or null).
+  function selectedSpecialistOpening() {
+    var sel = $('openingBook');
+    if (!sel) return null;
+    var idx = parseInt(sel.value, 10);
+    var list = window.ChessOpenings.SPECIALIST;
+    return list[idx] || null;
+  }
+
+  function populateOpeningBook() {
+    var sel = $('openingBook');
+    sel.innerHTML = '';
+    var labels = {w: 'As White', b: 'As Black'};
+    ['w', 'b'].forEach(function (side) {
+      var og = document.createElement('optgroup');
+      og.label = labels[side];
+      window.ChessOpenings.SPECIALIST.forEach(function (o) {
+        if (o.side !== side) return;
+        var opt = document.createElement('option');
+        opt.value = o.id;
+        opt.textContent = o.name;
+        og.appendChild(opt);
+      });
+      sel.appendChild(og);
+    });
+  }
+
+  function updateOpeningBookVisibility() {
+    var show = !!(state.ai.persona && state.ai.persona.specialist);
+    $('openingBookRow').classList.toggle('hidden', !show);
+  }
+
+  // Live opening name — reads the moves up to the position being viewed, so it
+  // also updates while stepping through a game. Shown regardless of Coach mode.
+  function renderOpeningLive() {
+    var eco = $('olEco'), name = $('olName'), tag = $('olTag');
+    var sans = state.records.slice(0, state.viewPly).map(function (r) { return r.san; });
+    if (sans.length === 0) {
+      eco.textContent = '';
+      name.textContent = 'Starting position';
+      tag.textContent = '';
+      tag.className = 'ol-tag';
+      return;
+    }
+    var res = window.ChessOpenings.lookup(sans);
+    if (res.opening) {
+      eco.textContent = res.opening.eco;
+      name.textContent = res.opening.name;
+      var stillTheory = res.inBook || sans.length === res.opening.moves.length;
+      tag.textContent = stillTheory ? 'in book' : 'out of book';
+      tag.className = 'ol-tag ' + (stillTheory ? 'book' : 'out');
+    } else {
+      eco.textContent = '';
+      name.textContent = 'Irregular opening';
+      tag.textContent = 'out of book';
+      tag.className = 'ol-tag out';
+    }
   }
 
   // Build 64 square cells once; we update contents on render.
@@ -439,8 +515,10 @@
       state.ai.setPersona(ChessAI.ROSTER[currentPersonaIndex()]);
       updateLevelMeta();
       updateRatedBadge();
+      updateOpeningBookVisibility();
       renderScouting();
     });
+    $('openingBook').addEventListener('change', renderScouting);
     $('side').addEventListener('change', function () {});
     $('clockEnabled').addEventListener('change', function () {
       state.clockEnabled = this.checked;
@@ -491,7 +569,14 @@
   function newGame() {
     exitReview(true); // leaving any saved-game review
     state.ai.setPersona(ChessAI.ROSTER[currentPersonaIndex()]);
+    if (state.ai.specialist) {
+      var spec = selectedSpecialistOpening();
+      state.ai.setOpening(spec ? spec.moves : null);
+    } else {
+      state.ai.setOpening(null);
+    }
     updateLevelMeta();
+    updateOpeningBookVisibility();
     renderScouting();
 
     // Persist the game-wide settings (they carry across a match's games).
@@ -933,6 +1018,7 @@
     renderPlayerBars(pos);
     renderMoves();
     renderClocks();
+    renderOpeningLive();
   }
 
   function renderPlayerBars(pos) {
@@ -1284,7 +1370,14 @@
       return r.san;
     });
     var opening = state.coach.identifyOpening(sanList);
-    $('openingName').textContent = opening ? opening.entry.name : 'Out of book';
+    // Prefer the comprehensive library's name for the header; fall back to the
+    // coach's own book (which also carries the strategic ideas below).
+    var libName = window.ChessOpenings.lookup(sanList).opening;
+    $('openingName').textContent = libName
+      ? libName.eco + ' · ' + libName.name
+      : opening
+      ? opening.entry.name
+      : 'Out of book';
 
     var wrap = $('coachMessages');
     wrap.innerHTML = '';

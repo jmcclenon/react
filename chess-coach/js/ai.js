@@ -360,6 +360,12 @@
     {name: 'GM Petrosian-style', level: 5, style: 'defensive'},
     {name: 'GM Capablanca-style', level: 5, style: 'positional'},
     {name: 'GM Tal-style', level: 5, style: 'tactical'},
+    // Opening specialists — you choose which opening book they play.
+    {name: 'Book Specialist (Casual)', level: 1, style: 'balanced', specialist: true},
+    {name: 'Book Specialist (Intermediate)', level: 2, style: 'balanced', specialist: true},
+    {name: 'Book Specialist (Advanced)', level: 3, style: 'balanced', specialist: true},
+    {name: 'Book Specialist (Expert)', level: 4, style: 'balanced', specialist: true},
+    {name: 'Book Specialist (Grandmaster)', level: 5, style: 'balanced', specialist: true},
   ];
 
   // Configure this engine as a specific roster persona.
@@ -368,7 +374,30 @@
     this.setLevel(persona.level);
     this.style = STYLES[persona.style] || STYLES.balanced;
     this.displayName = persona.name;
+    this.specialist = !!persona.specialist;
+    this.chosenOpening = null; // cleared; a specialist gets one via setOpening
     return this;
+  };
+
+  // Tell an opening specialist which line to steer toward (array of SAN moves).
+  AI.prototype.setOpening = function (moves) {
+    this.chosenOpening = moves && moves.length ? moves : null;
+  };
+
+  // If a chosen opening line is set and the game still matches it, return the
+  // next move from the line (for whichever side the engine is on).
+  AI.prototype.followChosenOpening = function (chess, sanHistory) {
+    var line = this.chosenOpening;
+    if (!line || !sanHistory || sanHistory.length >= line.length) return null;
+    for (var i = 0; i < sanHistory.length; i++) {
+      if (sanHistory[i] !== line[i]) return null; // game has left the line
+    }
+    var want = line[sanHistory.length];
+    var legal = chess.generateLegalMoves();
+    for (var j = 0; j < legal.length; j++) {
+      if (chess.toSan(legal[j]).replace(/[+#]$/, '') === want) return legal[j];
+    }
+    return null;
   };
 
   // Order moves to improve alpha-beta pruning: captures first (MVV-LVA),
@@ -564,6 +593,10 @@
   AI.prototype.chooseMove = function (chess, sanHistory) {
     var legal = chess.generateLegalMoves();
     if (legal.length === 0) return null;
+
+    // A specialist follows its chosen opening line while the game matches it.
+    var chosen = this.followChosenOpening(chess, sanHistory);
+    if (chosen) return chosen;
 
     // Opening book: play the persona's repertoire while it applies.
     var book = this.repertoireMove(chess, sanHistory);

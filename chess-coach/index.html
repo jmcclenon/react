@@ -50,6 +50,11 @@
           <select id="opponent"></select>
           <div class="level-meta" id="levelMeta"></div>
 
+          <div id="openingBookRow" class="hidden">
+            <label class="field" for="openingBook">Opening book (this specialist plays)</label>
+            <select id="openingBook"></select>
+          </div>
+
           <label class="field" for="side">Play as</label>
           <select id="side">
             <option value="w">White</option>
@@ -151,6 +156,11 @@
 
       <!-- CENTER: board -->
       <main class="board-area">
+        <div class="opening-live" id="openingLive">
+          <span class="ol-eco" id="olEco"></span>
+          <span class="ol-name" id="olName">Starting position</span>
+          <span class="ol-tag" id="olTag"></span>
+        </div>
         <div class="player-bar" id="topBar">
           <div class="who">
             <span class="dot black" id="topDot"></span>
@@ -248,6 +258,7 @@
     </div>
 
     <script src="js/engine.js"></script>
+    <script src="js/openings.js"></script>
     <script src="js/ai.js"></script>
     <script src="js/coach.js"></script>
     <script src="js/app.js"></script>

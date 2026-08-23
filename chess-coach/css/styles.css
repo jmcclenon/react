@@ -196,6 +196,53 @@ header.app-header {
   font-variant-numeric: tabular-nums;
 }
 
+/* ---------- Live opening banner ---------- */
+.opening-live {
+  width: min(72vw, 560px);
+  max-width: 560px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 14px;
+}
+.opening-live .ol-eco {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--accent);
+  background: rgba(124, 165, 255, 0.14);
+  border: 1px solid rgba(124, 165, 255, 0.3);
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-variant-numeric: tabular-nums;
+}
+.opening-live .ol-eco:empty {
+  display: none;
+}
+.opening-live .ol-name {
+  font-weight: 600;
+}
+.opening-live .ol-tag {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  padding: 1px 8px;
+  border-radius: 8px;
+}
+.opening-live .ol-tag.book {
+  color: var(--good);
+  background: rgba(123, 200, 108, 0.14);
+}
+.opening-live .ol-tag.out {
+  color: var(--muted);
+  background: rgba(154, 161, 173, 0.12);
+}
+
 /* ---------- Scouting report ---------- */
 .scouting .sc-head {
   display: flex;
