@@ -511,6 +511,21 @@
     k[0] = {from: m.from, to: m.to, promotion: m.promotion};
   };
 
+  // Does `color` have any non-pawn, non-king material? Used to disable null-move
+  // pruning in likely-zugzwang endgames (where passing is not truly harmless).
+  AI.prototype.hasNonPawn = function (chess, color) {
+    var b = chess.board;
+    for (var i = 0; i < 64; i++) {
+      var p = b[i];
+      if (p === null) continue;
+      if (colorOf(p) === color) {
+        var t = typeOf(p);
+        if (t === 'n' || t === 'b' || t === 'r' || t === 'q') return true;
+      }
+    }
+    return false;
+  };
+
   // Quiescence search: only extend captures/promotions to reach a "quiet"
   // position, so the evaluation isn't taken in the middle of a trade.
   AI.prototype.quiescence = function (chess, alpha, beta, color) {
@@ -570,12 +585,29 @@
       return color === 'w' ? evaluate(chess, this.style) : -evaluate(chess, this.style);
     }
 
+    var enemy = other(color);
+    var kingBefore = chess.kingIndex(color);
+    var inCheck = chess.isSquareAttacked(kingBefore, enemy);
+
+    // Check extension: search one ply deeper when in check (tactics/mates).
+    if (inCheck) depth++;
+
+    // Null-move pruning: if we can "pass" and still be >= beta at reduced depth,
+    // this node is so good it can be pruned. Skipped in check, in likely-
+    // zugzwang endgames (no non-pawn material), and near mate bounds.
+    if (!inCheck && depth >= 3 && beta < MATE - 1000 && beta > -(MATE - 1000) && this.hasNonPawn(chess, color)) {
+      var un = chess.makeNullMove();
+      var R = depth > 6 ? 3 : 2;
+      var nullScore = -this.negamax(chess, depth - 1 - R, -beta, -beta + 1, enemy, ply + 1);
+      chess.undoNullMove(un);
+      if (this.timedOut) return alpha;
+      if (nullScore >= beta) return beta;
+    }
+
     // Pseudo-legal moves, ordered; legality is verified lazily below so a beta
     // cutoff avoids checking the legality of moves we never search.
     var moves = chess.generatePseudoMoves(color);
     this.orderMoves(moves, ttMove, ply);
-    var enemy = other(color);
-    var kingBefore = chess.kingIndex(color);
 
     var best = -Infinity, bestMove = null, legal = 0;
     for (var i = 0; i < moves.length; i++) {
@@ -587,12 +619,18 @@
         continue;
       }
       legal++;
+      var quiet = !m.captured && !m.promotion;
       var score;
       if (legal === 1) {
         score = -this.negamax(chess, depth - 1, -beta, -alpha, enemy, ply + 1);
       } else {
-        // PVS: search later moves with a null window, re-search if promising.
-        score = -this.negamax(chess, depth - 1, -alpha - 1, -alpha, enemy, ply + 1);
+        // Late-move reduction: search quiet, late moves shallower first.
+        var red = 0;
+        if (quiet && !inCheck && depth >= 3 && legal > 3) red = legal > 6 ? 2 : 1;
+        score = -this.negamax(chess, depth - 1 - red, -alpha - 1, -alpha, enemy, ply + 1);
+        if (red > 0 && score > alpha && !this.timedOut) {
+          score = -this.negamax(chess, depth - 1, -alpha - 1, -alpha, enemy, ply + 1);
+        }
         if (score > alpha && score < beta && !this.timedOut) {
           score = -this.negamax(chess, depth - 1, -beta, -alpha, enemy, ply + 1);
         }
@@ -602,7 +640,7 @@
       if (score > best) { best = score; bestMove = m; }
       if (best > alpha) alpha = best;
       if (alpha >= beta) {
-        if (!m.captured && !m.promotion) {
+        if (quiet) {
           this.addKiller(ply, m);
           this.hist[m.from * 64 + m.to] += depth * depth;
         }
@@ -611,7 +649,7 @@
     }
 
     if (legal === 0) { // no legal moves: checkmate or stalemate
-      return chess.isSquareAttacked(kingBefore, enemy) ? -(MATE - ply) : 0;
+      return inCheck ? -(MATE - ply) : 0;
     }
 
     // Store in the transposition table (with mate-distance-relative score).
@@ -640,7 +678,9 @@
     this.nodes = 0;
     this.timedOut = false;
     this.deadline = timeMs > 0 ? Date.now() + timeMs : Infinity;
-    this.tt = new Map();
+    // The transposition table persists across moves (depth-preferred entries
+    // stay useful); killers/history are per-search. Cap TT memory periodically.
+    if (!this.tt || this.tt.size > 600000) this.tt = new Map();
     this.hist = new Int32Array(64 * 64);
     this.killers = [];
 

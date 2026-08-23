@@ -290,6 +290,24 @@
     return this.isSquareAttacked(k, color === WHITE ? BLACK : WHITE);
   };
 
+  // Null move: pass the turn to the opponent (used by null-move pruning in the
+  // search). Clears the en-passant square and updates the hash accordingly.
+  Chess.prototype.makeNullMove = function () {
+    var undo = {epSquare: this.epSquare, hash: this.hash, turn: this.turn, halfmoves: this.halfmoves};
+    if (this.epSquare !== null) this.hash = (this.hash ^ ZOB.ep[fileOf(this.epSquare)]) >>> 0;
+    this.hash = (this.hash ^ ZOB.side) >>> 0;
+    this.epSquare = null;
+    this.halfmoves++;
+    this.turn = this.turn === WHITE ? BLACK : WHITE;
+    return undo;
+  };
+  Chess.prototype.undoNullMove = function (undo) {
+    this.epSquare = undo.epSquare;
+    this.hash = undo.hash;
+    this.turn = undo.turn;
+    this.halfmoves = undo.halfmoves;
+  };
+
   // Generate pseudo-legal moves for the side to move (or given color).
   // Each move: {from, to, piece, captured, promotion, flags}
   // flags: 'n' normal, 'c' capture, 'b' big pawn (2 sq), 'e' en passant,
