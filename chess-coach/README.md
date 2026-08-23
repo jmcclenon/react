@@ -46,6 +46,27 @@ Six levels, each with its own search depth, thinking-time budget, and
 | Expert | ~2100 | Deep, accurate calculation |
 | **Grandmaster** | ~2500 | Max depth + quiescence — a serious fight |
 
+### Opponents & scouting
+- **Named personalities at every ELO** — each opponent has a playing style:
+  Aggressive, Tactical, Positional, Solid/Defensive, or Balanced. Styles are
+  real: they reshape the engine's evaluation (material vs. king-attack vs.
+  positional weighting) and give each personality its own **opening
+  repertoire** (e.g. the Tactical players open with the King's Gambit, the
+  Positional players prefer 1.d4/1.c4, the Defensive players play the London).
+- **Scouting Report** — pick an opponent and read a dossier of their opening
+  book (as White and Black), offense, defense, search depth, and a "how to beat
+  it" tip.
+
+### Rating, history & tournaments
+- **Elo rating** starting at 1000, updated only after *uncoached* games (Coach
+  off, Analysis off, no hints), with a **rating-history line chart**.
+- **Tournament mode** — best-of-3/5/7 matches with alternating colors and a
+  running scoreline.
+
+### Saved games
+- Finished games auto-save; a **Saved Games** panel lets you **replay** (step
+  through) or delete them. Stored locally in the browser.
+
 ### Play & tools
 - Click-to-move with legal-move highlighting and pawn-promotion picker.
 - Play as **White or Black**; the board can be flipped.

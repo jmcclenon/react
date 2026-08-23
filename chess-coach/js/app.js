@@ -356,6 +356,7 @@
     sel.value = 0;
     state.ai.setPersona(ChessAI.ROSTER[0]);
     updateLevelMeta();
+    renderScouting();
   }
 
   function currentPersonaIndex() {
@@ -381,6 +382,35 @@
   // Display name for the current opponent (persona name, else level name).
   function aiName() {
     return state.ai.displayName || state.ai.level.name;
+  }
+
+  // Render the scouting dossier for the currently selected opponent: strength,
+  // style, opening book (as White and Black), offense, defense, and a "tell"
+  // for how to play against them.
+  function renderScouting() {
+    var host = $('scoutingReport');
+    if (!host) return;
+    var lvl = state.ai.level;
+    var style = state.ai.style || ChessAI.STYLES.balanced;
+    var prof = ChessAI.STYLE_PROFILE[style.key] || ChessAI.STYLE_PROFILE.balanced;
+    var think = lvl.maxDepth + (lvl.maxDepth === 1 ? ' ply' : ' plies') +
+      ' · ~' + (lvl.timeMs / 1000) + 's/move' + (lvl.quiescence ? ' · quiescence' : '');
+
+    host.innerHTML =
+      '<div class="sc-head">' +
+        '<span class="sc-name">' + aiName() + '</span>' +
+        '<span class="sc-elo">~' + lvl.elo + ' Elo</span>' +
+      '</div>' +
+      '<span class="sc-style">' + style.label + '</span>' +
+      '<div class="sc-blurb">' + style.blurb + '</div>' +
+      '<dl>' +
+        '<dt>Opening (W)</dt><dd>' + prof.openingWhite + '</dd>' +
+        '<dt>Opening (B)</dt><dd>' + prof.openingBlack + '</dd>' +
+        '<dt>Offense</dt><dd>' + prof.offense + '</dd>' +
+        '<dt>Defense</dt><dd>' + prof.defense + '</dd>' +
+        '<dt>Search</dt><dd>' + think + '</dd>' +
+      '</dl>' +
+      '<div class="sc-tell"><strong>How to beat it:</strong> ' + prof.weakness + '</div>';
   }
 
   // Build 64 square cells once; we update contents on render.
@@ -409,6 +439,7 @@
       state.ai.setPersona(ChessAI.ROSTER[currentPersonaIndex()]);
       updateLevelMeta();
       updateRatedBadge();
+      renderScouting();
     });
     $('side').addEventListener('change', function () {});
     $('clockEnabled').addEventListener('change', function () {
@@ -461,6 +492,7 @@
     exitReview(true); // leaving any saved-game review
     state.ai.setPersona(ChessAI.ROSTER[currentPersonaIndex()]);
     updateLevelMeta();
+    renderScouting();
 
     // Persist the game-wide settings (they carry across a match's games).
     state.clockEnabled = $('clockEnabled').checked;
@@ -1146,7 +1178,8 @@
         return;
       }
       var pre = state.preMoveAnalysis;
-      var move = state.ai.chooseMove(state.game);
+      var sanHistory = state.records.map(function (r) { return r.san; });
+      var move = state.ai.chooseMove(state.game, sanHistory);
       if (!move) {
         state.aiThinking = false;
         checkGameEnd();

@@ -197,6 +197,99 @@
     defensive: {key: 'defensive', label: 'Solid / Defensive', material: 1.12, position: 0.95, attack: 0.15, blurb: 'Trades down, hoards material, and defends stubbornly.'},
   };
 
+  // Opening repertoires per style. Keyed by the space-joined SAN history from
+  // the start; the value is a list of preferred replies (most-favoured first).
+  // Because the history length fixes whose turn it is, both White openings and
+  // Black responses live in one table — the engine only consults the entry that
+  // matches the current position on its move. Used only in the first few moves,
+  // after which the engine searches normally.
+  var REPERTOIRE = {
+    balanced: {
+      '': ['e4'],
+      e4: ['e5'], d4: ['d5'], c4: ['e5'], Nf3: ['d5'],
+      'e4 e5': ['Nf3'],
+      'e4 e5 Nf3 Nc6': ['Bb5', 'Bc4'],
+      'e4 c5': ['Nf3'], 'e4 e6': ['d4'], 'e4 c6': ['d4'],
+    },
+    aggressive: {
+      '': ['e4'],
+      e4: ['e5', 'c5'], d4: ['Nf6'], c4: ['e5'], Nf3: ['Nf6'],
+      'e4 e5': ['Bc4', 'Nf3'],
+      'e4 e5 Nf3 Nc6': ['Bc4'],
+      'e4 e5 Bc4 Nc6': ['Nf3'],
+      'e4 c5': ['Nf3'], 'e4 e6': ['d4'], 'e4 c6': ['d4'],
+    },
+    tactical: {
+      '': ['e4'],
+      e4: ['c5', 'e5'], d4: ['Nf6'], c4: ['e5'], Nf3: ['Nf6'],
+      'e4 e5': ['f4', 'Bc4'], // King's Gambit
+      'e4 e5 f4 exf4': ['Nf3'],
+      'e4 e5 f4 Bc5': ['Nf3'],
+      'e4 c5': ['Nf3'], 'e4 e6': ['d4'],
+    },
+    positional: {
+      '': ['d4', 'c4'],
+      e4: ['e6', 'c6'], d4: ['d5', 'Nf6'], c4: ['e5'], Nf3: ['d5'],
+      'd4 d5': ['c4'], // Queen's Gambit
+      'd4 Nf6': ['c4'],
+      'd4 d5 c4 e6': ['Nc3'],
+      'c4 e5': ['Nc3'],
+    },
+    defensive: {
+      '': ['d4'],
+      e4: ['c6', 'e6'], d4: ['d5'], c4: ['e6'], Nf3: ['d5'],
+      'd4 d5': ['Nf3'], // slow, no gambit
+      'd4 Nf6': ['Nf3'],
+      'd4 d5 Nf3 Nf6': ['Bf4'], // London System
+      'd4 d5 Nf3 Nc6': ['Bf4'],
+    },
+  };
+
+  // Human-readable scouting notes per style, surfaced in the app so players can
+  // prepare against each opponent.
+  var STYLE_PROFILE = {
+    balanced: {
+      openingWhite: '1.e4 and classical development (Ruy López / Italian).',
+      openingBlack: '1...e5 vs 1.e4; 1...d5 vs 1.d4 — sound, mainstream replies.',
+      offense: 'Takes chances when they arise but does not force matters; converts advantages steadily.',
+      defense: 'Reliable; defends accurately and rarely over-extends.',
+      strength: 'Few weaknesses — punishes clearly bad moves.',
+      weakness: 'No special agenda; out-play it with a concrete plan.',
+    },
+    aggressive: {
+      openingWhite: '1.e4, aiming the bishop at f7 (Italian) for a fast attack.',
+      openingBlack: 'Fights back with 1...e5 or the Sicilian 1...c5.',
+      offense: 'Relentless — brings pieces toward your king and will give up material for the initiative.',
+      defense: 'Impatient on defense; can neglect king safety when attacking.',
+      strength: 'Dangerous in open, tactical positions.',
+      weakness: 'Blunt its attack by trading pieces and castling early; if the assault fizzles it is often down material.',
+    },
+    tactical: {
+      openingWhite: "Gambits — the King's Gambit (1.e4 e5 2.f4), sacrificing a pawn for open lines.",
+      openingBlack: 'Sharp defenses, especially the Sicilian, to unbalance the game.',
+      offense: 'Thrives on complications, sacrifices, and forcing tactics.',
+      defense: 'Prefers counter-attack to passive defense.',
+      strength: 'Lethal if you enter tactical slugfests unprepared.',
+      weakness: 'Decline gambits or return material to reach a calm, technical position where its sacrifices lose their point.',
+    },
+    positional: {
+      openingWhite: "1.d4 / 1.c4 — the Queen's Gambit and English, fighting for the center with pawns.",
+      openingBlack: 'Solid, strategic setups: the French (1...e6) or Caro-Kann (1...c6).',
+      offense: 'Slow squeeze — accumulates small advantages, good squares, and better structure.',
+      defense: 'Excellent; avoids weaknesses and untangles patiently.',
+      strength: 'Grinds out closed, maneuvering positions.',
+      weakness: 'Create sharp tactical complications and direct threats before it consolidates its long-term edge.',
+    },
+    defensive: {
+      openingWhite: '1.d4 into solid systems like the London (d4/Nf3/Bf4) — no early risks.',
+      openingBlack: 'Rock-solid Caro-Kann (1...c6) and French (1...e6) structures.',
+      offense: 'Minimal — happy to trade into a safe, simplified position.',
+      defense: 'Stubborn; hoards material and defends every pawn.',
+      strength: 'Very hard to break down; punishes reckless attacks.',
+      weakness: 'Keep pieces on and build slowly; its passivity means it seldom creates its own threats — squeeze it.',
+    },
+  };
+
   var MATE = 100000;
 
   function AI(level) {
@@ -236,6 +329,8 @@
   };
 
   AI.STYLES = STYLES;
+  AI.STYLE_PROFILE = STYLE_PROFILE;
+  AI.REPERTOIRE = REPERTOIRE;
 
   // A roster of named opponents: several distinct playing styles at each ELO
   // band. `level` indexes AI.LEVELS; `style` indexes AI.STYLES.
@@ -440,9 +535,39 @@
   };
 
   // Choose a move for the AI to play, honoring the level's blunder chance.
-  AI.prototype.chooseMove = function (chess) {
+  // Pick a move from this persona's opening repertoire, if one applies to the
+  // current position. `sanHistory` is the list of SAN moves played so far.
+  AI.prototype.repertoireMove = function (chess, sanHistory) {
+    if (!this.style || !sanHistory) return null;
+    var rep = REPERTOIRE[this.style.key];
+    if (!rep) return null;
+    if (sanHistory.length > 8) return null; // repertoire only covers the opening
+    var cands = rep[sanHistory.join(' ')];
+    if (!cands || cands.length === 0) return null;
+
+    var legal = chess.generateLegalMoves();
+    var options = [];
+    for (var i = 0; i < cands.length; i++) {
+      for (var j = 0; j < legal.length; j++) {
+        if (chess.toSan(legal[j]).replace(/[+#]$/, '') === cands[i]) {
+          options.push(legal[j]);
+          break;
+        }
+      }
+    }
+    if (options.length === 0) return null;
+    // Usually play the top choice; occasionally vary among the known replies.
+    if (options.length === 1 || Math.random() < 0.7) return options[0];
+    return options[Math.floor(Math.random() * options.length)];
+  };
+
+  AI.prototype.chooseMove = function (chess, sanHistory) {
     var legal = chess.generateLegalMoves();
     if (legal.length === 0) return null;
+
+    // Opening book: play the persona's repertoire while it applies.
+    var book = this.repertoireMove(chess, sanHistory);
+    if (book) return book;
 
     // Deliberate blunder: pick a random legal move (weak levels only).
     if (this.level.blunderChance > 0 && Math.random() < this.level.blunderChance) {
