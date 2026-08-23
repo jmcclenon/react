@@ -135,6 +135,79 @@
   var _wpMin = new Int8Array(8), _wpMax = new Int8Array(8);
   var _bpMin = new Int8Array(8), _bpMax = new Int8Array(8);
 
+  // Move offsets (mirror of the engine's) for static exchange evaluation.
+  var LVA_KNIGHT = [-17, -15, -10, -6, 6, 10, 15, 17];
+  var LVA_KING = [-9, -8, -7, -1, 1, 7, 8, 9];
+  var LVA_BISHOP = [-9, -7, 7, 9];
+  var LVA_ROOK = [-8, -1, 1, 8];
+
+  // Square of the least-valuable `side` piece attacking `to` on board `b`
+  // (re-scanned each call, so x-ray attackers behind a removed piece appear
+  // naturally). Returns -1 if none.
+  function leastValuableAttacker(b, to, side) {
+    var tf = to & 7, i, s, sf, dir, sq, next, nf, prevf, p;
+    var bestSq = -1, bestVal = Infinity;
+    function consider(square, val) { if (val < bestVal) { bestVal = val; bestSq = square; } }
+
+    if (side === 'w') {
+      if (tf > 0 && to + 7 < 64 && b[to + 7] === 'P') consider(to + 7, 100);
+      if (tf < 7 && to + 9 < 64 && b[to + 9] === 'P') consider(to + 9, 100);
+    } else {
+      if (tf < 7 && to - 7 >= 0 && b[to - 7] === 'p') consider(to - 7, 100);
+      if (tf > 0 && to - 9 >= 0 && b[to - 9] === 'p') consider(to - 9, 100);
+    }
+    var kn = side === 'w' ? 'N' : 'n';
+    for (i = 0; i < 8; i++) { s = to + LVA_KNIGHT[i]; if (s < 0 || s > 63) continue; sf = s & 7; if (sf - tf > 2 || tf - sf > 2) continue; if (b[s] === kn) consider(s, 320); }
+    var bishop = side === 'w' ? 'B' : 'b', queen = side === 'w' ? 'Q' : 'q', rook = side === 'w' ? 'R' : 'r';
+    for (i = 0; i < 4; i++) {
+      dir = LVA_BISHOP[i]; sq = to;
+      while (true) { next = sq + dir; if (next < 0 || next > 63) break; nf = next & 7; prevf = sq & 7; if (nf - prevf > 1 || prevf - nf > 1) break; p = b[next]; if (p !== null) { if (p === bishop) consider(next, 330); else if (p === queen) consider(next, 900); break; } sq = next; }
+    }
+    for (i = 0; i < 4; i++) {
+      dir = LVA_ROOK[i]; sq = to; var horiz = dir === 1 || dir === -1;
+      while (true) { next = sq + dir; if (next < 0 || next > 63) break; if (horiz && (next >> 3) !== (sq >> 3)) break; p = b[next]; if (p !== null) { if (p === rook) consider(next, 500); else if (p === queen) consider(next, 900); break; } sq = next; }
+    }
+    var kg = side === 'w' ? 'K' : 'k';
+    for (i = 0; i < 8; i++) { s = to + LVA_KING[i]; if (s < 0 || s > 63) continue; sf = s & 7; if (sf - tf > 1 || tf - sf > 1) continue; if (b[s] === kg) consider(s, 20000); }
+    return bestSq;
+  }
+
+  // Static Exchange Evaluation: the net material (mover's perspective) of the
+  // capture `move`, assuming both sides recapture with least-valuable pieces.
+  // Negative means the capture loses material.
+  function see(chess, move) {
+    var to = move.to;
+    var b = chess.board.slice();
+    var sideInit = colorOf(b[move.from]);
+    var firstCapturedVal;
+    if (move.flags.indexOf('e') !== -1) {
+      firstCapturedVal = 100;
+      b[sideInit === 'w' ? to + 8 : to - 8] = null;
+    } else {
+      firstCapturedVal = b[to] ? PIECE_VALUE[typeOf(b[to])] : 0;
+    }
+    var attackerValOnSquare = PIECE_VALUE[typeOf(b[move.from])];
+    b[to] = b[move.from];
+    b[move.from] = null;
+
+    var gain = [firstCapturedVal];
+    var d = 0;
+    var side = sideInit === 'w' ? 'b' : 'w';
+    while (true) {
+      var f = leastValuableAttacker(b, to, side);
+      if (f === -1) break;
+      d++;
+      gain[d] = attackerValOnSquare - gain[d - 1];
+      attackerValOnSquare = PIECE_VALUE[typeOf(b[f])];
+      b[to] = b[f];
+      b[f] = null;
+      side = side === 'w' ? 'b' : 'w';
+      if (Math.max(-gain[d - 1], gain[d]) < 0) break;
+    }
+    while (d > 0) { gain[d - 1] = -Math.max(-gain[d - 1], gain[d]); d--; }
+    return gain[0];
+  }
+
   // Static evaluation from White's perspective (positive = White better).
   // Combines material + piece-square tables with pawn structure (doubled,
   // isolated, passed), rook files, king safety, a small mobility/tempo term and
@@ -546,6 +619,9 @@
     var kingBefore = chess.kingIndex(color);
     for (var i = 0; i < caps.length; i++) {
       var m = caps[i];
+      // SEE pruning: skip captures that lose material by the exchange (a
+      // promotion capture is always tried — its value isn't captured material).
+      if (m.captured && !m.promotion && see(chess, m) < 0) continue;
       var undo = chess._makeMove(m);
       var ks = typeOf(m.piece) === 'k' ? m.to : kingBefore;
       if (chess.isSquareAttacked(ks, enemy)) { chess._undoMove(undo); continue; }
@@ -686,39 +762,58 @@
 
     var color = chess.turn;
     var enemy = other(color);
+    var aspiration = !!opts.aspiration;
     var rootMoves = chess.generateLegalMoves();
     if (rootMoves.length === 0) return null;
 
+    var self = this;
     var completed = rootMoves.map(function (m) { return {move: m, score: 0}; });
 
-    for (var depth = 1; depth <= maxDepth; depth++) {
+    // Search all root moves once at `depth` within the (alpha0, beta0) window.
+    function runRoot(depth, alpha0, beta0) {
       var iter = [];
-      var alpha = -Infinity;
-      var beta = Infinity;
-      var aborted = false;
-
+      var alpha = alpha0, beta = beta0, aborted = false;
       for (var i = 0; i < rootMoves.length; i++) {
         var undo = chess._makeMove(rootMoves[i]);
         var score;
         if (i === 0) {
-          score = -this.negamax(chess, depth - 1, -beta, -alpha, enemy, 1);
+          score = -self.negamax(chess, depth - 1, -beta, -alpha, enemy, 1);
         } else {
-          score = -this.negamax(chess, depth - 1, -alpha - 1, -alpha, enemy, 1);
-          if (score > alpha && !this.timedOut) {
-            score = -this.negamax(chess, depth - 1, -beta, -alpha, enemy, 1);
+          score = -self.negamax(chess, depth - 1, -alpha - 1, -alpha, enemy, 1);
+          if (score > alpha && score < beta && !self.timedOut) {
+            score = -self.negamax(chess, depth - 1, -beta, -alpha, enemy, 1);
           }
         }
         chess._undoMove(undo);
-        if (this.timedOut) { aborted = true; break; }
+        if (self.timedOut) { aborted = true; break; }
         iter.push({move: rootMoves[i], score: score});
         if (score > alpha) alpha = score;
       }
+      if (!aborted) iter.sort(function (a, b) { return b.score - a.score; });
+      return {iter: iter, aborted: aborted};
+    }
 
-      if (aborted) break; // keep the previous depth's complete result
+    var lastScore = 0;
+    for (var depth = 1; depth <= maxDepth; depth++) {
+      var res;
+      if (aspiration && depth >= 4) {
+        // Search a narrow window around the previous score; on a fail, re-search
+        // with the full window. Narrow windows prune far more.
+        var a = lastScore - 50, b = lastScore + 50;
+        res = runRoot(depth, a, b);
+        if (!res.aborted) {
+          var bs = res.iter[0].score;
+          if (bs <= a || bs >= b) res = runRoot(depth, -Infinity, Infinity);
+        }
+      } else {
+        res = runRoot(depth, -Infinity, Infinity);
+      }
 
-      iter.sort(function (a, b) { return b.score - a.score; });
-      completed = iter;
-      rootMoves = iter.map(function (x) { return x.move; });
+      if (res.aborted) break; // keep the previous depth's complete result
+
+      completed = res.iter;
+      rootMoves = completed.map(function (x) { return x.move; });
+      lastScore = completed[0].score;
       this.lastDepth = depth;
 
       if (Math.abs(completed[0].score) > MATE - 1000) break; // forced mate found
@@ -823,7 +918,7 @@
       return legal[Math.floor(Math.random() * legal.length)];
     }
 
-    var sopts = {noise: this.level.noise || 0};
+    var sopts = {noise: this.level.noise || 0, aspiration: true};
     if (opts && opts.timeMs) sopts.timeMs = opts.timeMs;
     var result = this.search(chess, sopts);
     return result ? result.best : legal[0];

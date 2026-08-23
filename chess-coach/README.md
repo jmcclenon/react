@@ -85,10 +85,12 @@ Six levels, each with its own search depth, thinking-time budget, and
 - **AI** (`ai.js`): a proper alpha-beta engine — **principal-variation search
   with a Zobrist-hashed transposition table** (persisted across moves),
   **null-move pruning**, **late-move reductions**, **check extensions**,
-  killer-move and history-heuristic ordering, MVV-LVA captures, a quiescence
-  search, and **iterative deepening under a per-move time budget**. Legality is
-  checked lazily during search (a big speedup), so the Grandmaster reaches a
-  serious depth (typically 6–10+ ply) in a few seconds.
+  killer-move and history-heuristic ordering, MVV-LVA captures, **aspiration
+  windows** at the root, a quiescence search with **static-exchange-evaluation
+  (SEE) pruning** of losing captures, and **iterative deepening under a per-move
+  time budget**. Legality is checked lazily during search (a big speedup), so
+  the Grandmaster reaches a serious depth (typically 6–10+ ply) in a few
+  seconds.
   Evaluation blends material, piece-square tables (middlegame/endgame king),
   pawn structure (doubled/isolated/passed), rook files, king safety, the bishop
   pair, and a tempo bonus — plus per-personality style weighting.
