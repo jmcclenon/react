@@ -983,14 +983,14 @@
         var fl = document.createElement('span');
         fl.className = 'coord file';
         fl.textContent = String.fromCharCode(97 + f);
-        fl.style.color = isLight ? '#739552' : '#ebecd0';
+        fl.style.color = isLight ? '#4a78b8' : '#eaf0fa';
         cell.appendChild(fl);
       }
       if (firstCol) {
         var rk = document.createElement('span');
         rk.className = 'coord rank';
         rk.textContent = 8 - r;
-        rk.style.color = isLight ? '#739552' : '#ebecd0';
+        rk.style.color = isLight ? '#4a78b8' : '#eaf0fa';
         cell.appendChild(rk);
       }
 
