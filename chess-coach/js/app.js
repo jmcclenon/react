@@ -69,37 +69,62 @@
   var RATING_KEY = 'chessCoach.rating.v1';
   var profile = loadProfile();
 
+  // Cookie helpers (a best-effort mirror of the profile so it survives even if
+  // localStorage is unavailable; cookies are capped in size so only the core
+  // profile — not the full rating history — is mirrored here).
+  function setCookie(name, value, days) {
+    try {
+      var exp = new Date(Date.now() + days * 864e5).toUTCString();
+      document.cookie = name + '=' + encodeURIComponent(value) + ';expires=' + exp + ';path=/;SameSite=Lax';
+    } catch (e) { /* ignore */ }
+  }
+  function getCookie(name) {
+    try {
+      var m = document.cookie.match('(?:^|; )' + name + '=([^;]*)');
+      return m ? decodeURIComponent(m[1]) : null;
+    } catch (e) { return null; }
+  }
+
+  function normalizeProfile(p) {
+    return {
+      name: p.name || '',
+      nickname: p.nickname || '',
+      joined: p.joined || Date.now(),
+      rating: typeof p.rating === 'number' ? p.rating : STARTING_RATING,
+      games: p.games || 0,
+      wins: p.wins || 0,
+      losses: p.losses || 0,
+      draws: p.draws || 0,
+      rated: p.rated || 0,
+      history: Array.isArray(p.history) ? p.history : [],
+    };
+  }
+
   function loadProfile() {
     var def = {name: '', nickname: '', joined: Date.now(), rating: STARTING_RATING, games: 0, wins: 0, losses: 0, draws: 0, rated: 0, history: []};
+    // Prefer localStorage (holds the full profile incl. rating history)…
     try {
       var raw = localStorage.getItem(RATING_KEY);
-      if (raw) {
-        var p = JSON.parse(raw);
-        return {
-          name: p.name || '',
-          nickname: p.nickname || '',
-          joined: p.joined || Date.now(),
-          rating: typeof p.rating === 'number' ? p.rating : STARTING_RATING,
-          games: p.games || 0,
-          wins: p.wins || 0,
-          losses: p.losses || 0,
-          draws: p.draws || 0,
-          rated: p.rated || 0,
-          history: Array.isArray(p.history) ? p.history : [],
-        };
-      }
-    } catch (e) {
-      /* localStorage unavailable (e.g. some file:// contexts) — use defaults */
+      if (raw) return normalizeProfile(JSON.parse(raw));
+    } catch (e) { /* localStorage unavailable */ }
+    // …then fall back to the cookie mirror (core profile without history).
+    var ck = getCookie(RATING_KEY);
+    if (ck) {
+      try { return normalizeProfile(JSON.parse(ck)); } catch (e2) { /* ignore */ }
     }
     return def;
   }
 
   function saveProfile() {
+    var json = JSON.stringify(profile);
     try {
-      localStorage.setItem(RATING_KEY, JSON.stringify(profile));
-    } catch (e) {
-      /* ignore persistence failures */
-    }
+      localStorage.setItem(RATING_KEY, json);
+    } catch (e) { /* ignore persistence failures */ }
+    // Mirror a compact copy (no history) to a 1-year cookie for redundancy.
+    var compact = {name: profile.name, nickname: profile.nickname, joined: profile.joined,
+      rating: profile.rating, games: profile.games, wins: profile.wins,
+      losses: profile.losses, draws: profile.draws, rated: profile.rated};
+    setCookie(RATING_KEY, JSON.stringify(compact), 365);
   }
 
   // Persistent store of finished/saved games (PGN + metadata) for replay.
@@ -535,6 +560,47 @@
     render(); // refresh the on-board name
   }
 
+  // ---- Portable profile backup -----------------------------------------
+  // localStorage keeps the profile between sessions, but it's tied to this
+  // browser + file location. Export/Import lets the player keep a real backup
+  // file they control — portable across browsers, machines, and file moves.
+  function exportProfile() {
+    try {
+      var data = JSON.stringify(normalizeProfile(profile), null, 2);
+      var blob = new Blob([data], {type: 'application/json'});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      var stamp = new Date().toISOString().slice(0, 10);
+      var who = (profile.nickname || profile.name || 'player').replace(/[^\w-]+/g, '_');
+      a.href = url;
+      a.download = 'chess-coach-profile-' + who + '-' + stamp + '.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    } catch (e) {
+      alert('Could not export the profile: ' + e.message);
+    }
+  }
+
+  function importProfile(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var loaded = normalizeProfile(JSON.parse(reader.result));
+        profile = loaded;
+        saveProfile();
+        renderProfile();
+        renderRating();
+        render();
+      } catch (e) {
+        alert('That file is not a valid Chess Coach profile backup.');
+      }
+    };
+    reader.readAsText(file);
+  }
+
   // ---- DOM refs ---------------------------------------------------------
   var $ = function (id) {
     return document.getElementById(id);
@@ -772,6 +838,12 @@
     $('editProfile').addEventListener('click', openProfileForm);
     $('saveProfile').addEventListener('click', saveProfileForm);
     $('cancelProfile').addEventListener('click', closeProfileForm);
+    $('exportProfile').addEventListener('click', exportProfile);
+    $('importProfile').addEventListener('click', function () { $('importProfileFile').click(); });
+    $('importProfileFile').addEventListener('change', function () {
+      importProfile(this.files && this.files[0]);
+      this.value = '';
+    });
     $('nextGame').addEventListener('click', startNextMatchGame);
     $('saveGame').addEventListener('click', saveCurrentGame);
     $('undoMove').addEventListener('click', undoMove);

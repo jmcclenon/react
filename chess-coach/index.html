@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Chess Coach — Learn Openings & Strategy</title>
+    <title>Chess Coach Pro v1.0.0</title>
     <link rel="stylesheet" href="css/styles.css" />
     <link
       rel="icon"
@@ -13,7 +13,7 @@
   <body>
     <header class="app-header">
       <span class="logo">♞</span>
-      <h1>Chess Coach</h1>
+      <h1>Chess Coach Pro <span class="version">v1.0.0</span></h1>
       <span class="tagline">
         Learn openings, strategy &amp; positioning — play from Beginner to
         Grandmaster
@@ -63,6 +63,16 @@
             <div class="rating-chart-title">Rating history</div>
             <div id="ratingChart" class="rating-chart"></div>
           </div>
+          <div class="control-row">
+            <button class="btn" id="exportProfile">Back up profile</button>
+            <button class="btn" id="importProfile">Restore</button>
+          </div>
+          <input type="file" id="importProfileFile" accept="application/json,.json" class="hidden" />
+          <p class="rating-hint" style="margin-top:6px">
+            Your profile is saved in this browser automatically. <strong>Back up
+            profile</strong> saves a file you can <strong>Restore</strong> on any
+            browser or PC.
+          </p>
           <button class="btn" id="resetRating">Reset rating</button>
         </section>
 
@@ -282,10 +292,7 @@
       </aside>
     </div>
 
-    <footer>
-      Chess Coach — a self-contained teaching chess app. Built with a custom
-      rules engine, minimax AI, an opening book, and a principle-based coach.
-    </footer>
+    <footer>Chess Coach Pro v1.0.0 — custom engine, opening book &amp; professional coach.</footer>
 
     <!-- Promotion dialog -->
     <div class="modal-backdrop" id="promoModal">

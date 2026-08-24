@@ -1,4 +1,4 @@
-# ♞ Chess Coach
+# ♞ Chess Coach Pro v1.0.0
 
 A self-contained chess app that **coaches** you on opening strategy and
 positioning while you play — with difficulty levels from Beginner all the way
@@ -6,6 +6,10 @@ up to **Grandmaster**, optional clocks, full move history, and live analysis.
 
 No build step, no dependencies, no network. Just open `index.html` in any modern
 browser.
+
+The interface is laid out to fit a full 1920×1080 screen with **no scrolling** —
+the controls spread across the empty space on both sides of the board, so every
+panel is visible at once.
 
 ```
 chess-coach/
@@ -104,7 +108,12 @@ Six levels, each with its own search depth, thinking-time budget, and
 - **Opening book**: all AIs play real, varied theory drawn from the opening
   library (weighted by style) before the search takes over.
 - **Player profile**: name, nickname, and "member since" date, alongside your
-  Elo rating, record, and rating-history graph — all saved locally.
+  Elo rating, record, and rating-history graph — all saved locally in the
+  browser (via `localStorage`, which works even from a `file://` page). Because
+  local storage is tied to one browser and file location, the profile panel also
+  has **Back up profile** / **Restore** buttons that export and re-import a JSON
+  file, so you can keep a portable backup and move your profile between browsers
+  or machines.
 - **Coach** (`coach.js`): a professional review engine. It grades every move
   (Brilliant / Great / Best / Excellent / Good / Book / Inaccuracy / Mistake /
   Miss / Blunder) and explains *why* in concrete terms — naming the piece and
