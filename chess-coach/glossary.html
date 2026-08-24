@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chess Glossary — Chess Coach Pro</title>
+    <link rel="stylesheet" href="css/styles.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♞</text></svg>"
+    />
+  </head>
+  <body>
+    <header class="app-header">
+      <span class="logo">♞</span>
+      <h1>Chess Coach Pro <span class="version">v1.0.0</span></h1>
+      <nav class="app-nav">
+        <a href="index.html">Play</a>
+        <a href="glossary.html" class="active">Glossary</a>
+        <a href="opening-systems.html">Opening Systems</a>
+      </nav>
+    </header>
+
+    <main class="content">
+      <h1 style="margin:0 0 6px;font-size:26px">Chess Glossary</h1>
+      <p class="lead">
+        A plain-English reference to the terms you will meet at the board and in
+        the coach's feedback — the rules, tactics, pawn structures, positional
+        ideas, and endgame concepts that make up the language of chess. Use the
+        search box or jump to a letter.
+      </p>
+
+      <input
+        type="text"
+        id="glossarySearch"
+        class="glossary-search"
+        placeholder="Search terms… (e.g. fork, zugzwang, en passant)"
+        autocomplete="off"
+      />
+
+      <nav class="glossary-jump" id="jumpBar"></nav>
+      <div id="noResults" class="no-results hidden">No terms match your search.</div>
+
+      <div id="glossaryBody">
+        <!-- A -->
+        <section class="letter-group" id="letter-A">
+          <h3>A</h3>
+          <dl class="term-grid">
+            <div class="term"><dt>Algebraic Notation</dt><dd>The standard way to record moves, naming each square by its <strong>file</strong> (a–h) and <strong>rank</strong> (1–8) — e.g. <strong>Nf3</strong> means a knight to f3.</dd></div>
+            <div class="term"><dt>Alekhine's Gun</dt><dd>A heavy <strong>battery</strong> of two rooks stacked on a file with the queen behind them — maximum pressure down one line.</dd></div>
+            <div class="term"><dt>Annotation</dt><dd>Written commentary and symbols (!, ?, !?, ⩲, …) that evaluate moves and positions.</dd></div>
+            <div class="term"><dt>Attack</dt><dd>Coordinated pressure against a target — a piece, a pawn, a weak square, or the enemy king.</dd></div>
+          </dl>
+        </section>
+
+        <!-- B -->
+        <section class="letter-group" id="letter-B">
+          <h3>B</h3>
+          <dl class="term-grid">
+            <div class="term"><dt>Back-rank Mate</dt><dd>Checkmate along the opponent's first rank when their king is trapped behind its own unmoved pawns.</dd></div>
+            <div class="term"><dt>Backward Pawn</dt><dd>A pawn left behind its neighbours that no friendly pawn can defend and that cannot safely advance — a lasting weakness.</dd></div>
+            <div class="term"><dt>Battery</dt><dd>Two or more pieces lined up on the same file, rank, or diagonal (e.g. queen + bishop) to multiply their force.</dd></div>
+            <div class="term"><dt>Bishop Pair</dt><dd>Holding both bishops while the opponent has at most one. In <strong>open positions</strong> the pair sweeps long diagonals and is worth roughly half a pawn.</dd></div>
+            <div class="term"><dt>Blitz</dt><dd>A fast time control, typically 3–5 minutes per side.</dd></div>
+            <div class="term"><dt>Blockade</dt><dd>Parking a piece — ideally a knight — directly in front of an enemy <strong>passed pawn</strong> so it cannot advance.</dd></div>
+            <div class="term"><dt>Blunder <span class="also">??</span></dt><dd>A serious mistake that loses material or the game outright.</dd></div>
+            <div class="term"><dt>Book Move</dt><dd>An established opening move drawn from known theory.</dd></div>
+            <div class="term"><dt>Bullet</dt><dd>Very fast chess, usually 1 minute (sometimes 2) per side.</dd></div>
+          </dl>
+        </section>
+
+        <!-- C -->
+        <section class="letter-group" id="letter-C">
+          <h3>C</h3>
+          <dl class="term-grid">
+            <div class="term"><dt>Candidate Move</dt><dd>A move you single out to calculate during your thinking process.</dd></div>
+            <div class="term"><dt>Castling <span class="also">O-O / O-O-O</span></dt><dd>A once-per-game king-and-rook move for king safety: <strong>kingside</strong> (O-O) or <strong>queenside</strong> (O-O-O). Neither piece may have moved, and the king can't pass through check.</dd></div>
+            <div class="term"><dt>Centralization</dt><dd>Placing pieces near the centre, where they control the most squares and switch flanks fastest.</dd></div>
+            <div class="term"><dt>Check</dt><dd>A direct attack on the king that must be answered immediately (block, capture, or move the king).</dd></div>
+            <div class="term"><dt>Checkmate</dt><dd>The king is in check with no legal way out — the game ends.</dd></div>
+            <div class="term"><dt>Combination</dt><dd>A forcing sequence, often involving a <strong>sacrifice</strong>, that reaches a concrete goal by calculation.</dd></div>
+            <div class="term"><dt>Connected Pawns</dt><dd>Pawns on adjacent files that can defend one another.</dd></div>
+            <div class="term"><dt>Connected Passed Pawns</dt><dd>Adjacent <strong>passed pawns</strong> — a powerful, often winning, duo in the endgame.</dd></div>
+            <div class="term"><dt>Counterplay</dt><dd>Active play that creates your own threats instead of merely defending against the opponent's.</dd></div>
+            <div class="term"><dt>Cramped</dt><dd>A position with little space, where the pieces get in each other's way.</dd></div>
+          </dl>
+        </section>
+
+        <!-- D -->
+        <section class="letter-group" id="letter-D">
+          <h3>D</h3>
+          <dl class="term-grid">
+            <div class="term"><dt>Decoy</dt><dd>Luring an enemy piece onto a square where it can be exploited.</dd></div>
+            <div class="term"><dt>Deflection</dt><dd>Forcing a defending piece away from the duty it is performing.</dd></div>
+            <div class="term"><dt>Desperado</dt><dd>A piece that is already lost grabbing material (or forcing a trade) before it disappears.</dd></div>
+            <div class="term"><dt>Development</dt><dd>Bringing your pieces off the back rank into active, useful positions — a core opening goal.</dd></div>
+            <div class="term"><dt>Discovered Attack</dt><dd>Moving one piece to unveil an attack from a piece standing behind it.</dd></div>
+            <div class="term"><dt>Discovered Check</dt><dd>A discovered attack that delivers check — often devastating because the moving piece is free to strike elsewhere.</dd></div>
+            <div class="term"><dt>Double Check</dt><dd>Check from two pieces at once. The only legal reply is to move the king.</dd></div>
+            <div class="term"><dt>Doubled Pawns</dt><dd>Two friendly pawns on the same file — usually a weakness, though they can open files in return.</dd></div>
+            <div class="term"><dt>Draw</dt><dd>A game with no winner: by stalemate, threefold repetition, the fifty-move rule, insufficient material, or agreement.</dd></div>
+          </dl>
+        </section>
+
+        <!-- E -->
+        <section class="letter-group" id="letter-E">
+          <h3>E</h3>
+          <dl class="term-grid">
+            <div class="term"><dt>ECO</dt><dd>The <strong>Encyclopaedia of Chess Openings</strong>, which classifies every opening with a code from A00 to E99.</dd></div>
+            <div class="term"><dt>Elo</dt><dd>The rating system that measures relative playing strength; higher is stronger.</dd></div>
+            <div class="term"><dt>En Passant <span class="also">"in passing"</span></dt><dd>A special capture: if an enemy pawn advances two squares and lands beside your pawn, you may capture it as if it had moved only one — but only on the very next move.</dd></div>
+            <div class="term"><dt>En Prise</dt><dd>A piece left undefended and free to be taken.</dd></div>
+            <div class="term"><dt>Endgame</dt><dd>The final phase, with few pieces left, where king activity and pawns decide the outcome.</dd></div>
+            <div class="term"><dt>Exchange (the)</dt><dd>Winning a <strong>rook</strong> for a <strong>minor piece</strong> is "winning the exchange." Lower-case "an exchange" also just means a trade of pieces.</dd></div>
+          </dl>
+        </section>
+
+        <!-- F -->
+        <section class="letter-group" id="letter-F">
+          <h3>F</h3>
+          <dl class="term-grid">
+            <div class="term"><dt>Fianchetto</dt><dd>Developing a bishop to b2, g2, b7, or g7 after moving the knight-pawn — aiming it along the long diagonal.</dd></div>
+            <div class="term"><dt>FEN</dt><dd><strong>Forsyth–Edwards Notation</strong>: a single line of text that fully describes a position (used to set up puzzles and share positions).</dd></div>
+            <div class="term"><dt>File</dt><dd>A vertical column of squares, labelled a to h.</dd></div>
+            <div class="term"><dt>Fifty-move Rule</dt><dd>Either player may claim a draw if 50 consecutive moves pass with no capture and no pawn move.</dd></div>
+            <div class="term"><dt>Flag</dt><dd>Running out of time. To "flag" someone is to win because their clock hit zero.</dd></div>
+            <div class="term"><dt>Fork</dt><dd>A single piece attacking two or more targets at once — the knight is the classic forker.</dd></div>
+            <div class="term"><dt>Fortress</dt><dd>A defensive setup the stronger side simply cannot break down, holding a draw despite being down material.</dd></div>
+          </dl>
+        </section>
+
+        <!-- G -->
+        <section class="letter-group" id="letter-G">
+          <h3>G</h3>
+          <dl class="term-grid">
+            <div class="term"><dt>Gambit</dt><dd>An opening that deliberately sacrifices material — usually a pawn — for faster development, the initiative, or an attack.</dd></div>
+            <div class="term"><dt>Good Bishop</dt><dd>A bishop whose movement is <em>not</em> blocked by its own pawns (the opposite of a <strong>bad bishop</strong>).</dd></div>
+            <div class="term"><dt>Grandmaster <span class="also">GM</span></dt><dd>The highest lifetime title awarded by FIDE.</dd></div>
+          </dl>
+        </section>
+
+        <!-- H -->
+        <section class="letter-group" id="letter-H">
+          <h3>H</h3>
+          <dl class="term-grid">
+            <div class="term"><dt>Half-open File</dt><dd>A file with pawns of only one colour — excellent for a rook to press against the lone pawn.</dd></div>
+            <div class="term"><dt>Hanging Pawns</dt><dd>Two adjacent friendly pawns (typically on c- and d-files) with no pawns on the files beside them — dynamic but vulnerable.</dd></div>
+            <div class="term"><dt>Hanging Piece</dt><dd>An undefended piece that can be captured for free.</dd></div>
+            <div class="term"><dt>Hole</dt><dd>A square in your camp that no pawn can ever defend again — a natural home (<strong>outpost</strong>) for an enemy piece.</dd></div>
+          </dl>
+        </section>
+
+        <!-- I -->
+        <section class="letter-group" id="letter-I">
+          <h3>I</h3>
+          <dl class="term-grid">
+            <div class="term"><dt>In-between Move <span class="also">Zwischenzug</span></dt><dd>An unexpected move — usually a check or threat — slipped in before making the "obvious" recapture or reply.</dd></div>
+            <div class="term"><dt>Initiative</dt><dd>The power to make threats and dictate the flow of the game.</dd></div>
+            <div class="term"><dt>Interference</dt><dd>Interposing a piece to cut the line between an enemy piece and what it guards.</dd></div>
+            <div class="term"><dt>Isolated Pawn <span class="also">Isolani</span></dt><dd>A pawn with no friendly pawns on either adjacent file — it must be defended by pieces and the square in front is a weakness.</dd></div>
+            <div class="term"><dt>IQP</dt><dd>The <strong>Isolated Queen's Pawn</strong> — a common structure that gives active piece play in return for a long-term weakness.</dd></div>
+          </dl>
+        </section>
+
+        <!-- J -->
+        <section class="letter-group" id="letter-J">
+          <h3>J</h3>
+          <dl class="term-grid">
+            <div class="term"><dt>J'adoube <span class="also">"I adjust"</span></dt><dd>Said aloud before touching a piece to re-centre it, so the <strong>touch-move</strong> rule does not force you to play it.</dd></div>
+          </dl>
+        </section>
+
+        <!-- K -->
+        <section class="letter-group" id="letter-K">
+          <h3>K</h3>
+          <dl class="term-grid">
+            <div class="term"><dt>Key Square</dt><dd>A square whose control decides the position — especially in king-and-pawn endgames.</dd></div>
+            <div class="term"><dt>Kingside</dt><dd>The half of the board nearest the kings' starting side, files e–h.</dd></div>
+            <div class="term"><dt>Kingside Castling <span class="also">O-O</span></dt><dd>Castling toward the h-file — the fastest, most common route to safety.</dd></div>
+          </dl>
+        </section>
+
+        <!-- L -->
+        <section class="letter-group" id="letter-L">
+          <h3>L</h3>
+          <dl class="term-grid">
+            <div class="term"><dt>Luft <span class="also">German: "air"</span></dt><dd>A breathing hole made by nudging a pawn in front of the castled king, so a rook check on the back rank isn't mate.</dd></div>
+            <div class="term"><dt>Lucena Position</dt><dd>A fundamental winning technique in rook endgames — "building a bridge" to shepherd a pawn home.</dd></div>
+          </dl>
+        </section>
+
+        <!-- M -->
+        <section class="letter-group" id="letter-M">
+          <h3>M</h3>
+          <dl class="term-grid">
+            <div class="term"><dt>Major Piece</dt><dd>A queen or a rook.</dd></div>
+            <div class="term"><dt>Material</dt><dd>The total value of your pieces. To be "up material" is to have more than the opponent.</dd></div>
+            <div class="term"><dt>Middlegame</dt><dd>The phase after the opening — the richest ground for tactics, attacks, and planning.</dd></div>
+            <div class="term"><dt>Minority Attack</dt><dd>Advancing your fewer pawns against the opponent's majority to create a weakness — the classic plan against the Queen's Gambit Declined.</dd></div>
+            <div class="term"><dt>Minor Piece</dt><dd>A bishop or a knight.</dd></div>
+          </dl>
+        </section>
+
+        <!-- N -->
+        <section class="letter-group" id="letter-N">
+          <h3>N</h3>
+          <dl class="term-grid">
+            <div class="term"><dt>Notation</dt><dd>Any system for recording a game; <strong>algebraic notation</strong> is today's standard.</dd></div>
+          </dl>
+        </section>
+
+        <!-- O -->
+        <section class="letter-group" id="letter-O">
+          <h3>O</h3>
+          <dl class="term-grid">
+            <div class="term"><dt>Open File</dt><dd>A file with no pawns on it — prime real estate for a rook.</dd></div>
+            <div class="term"><dt>Open Game</dt><dd>Openings beginning 1.e4 e5, which tend to lead to early piece contact.</dd></div>
+            <div class="term"><dt>Opening</dt><dd>The first phase of the game, focused on development, the centre, and king safety.</dd></div>
+            <div class="term"><dt>Opposite-coloured Bishops</dt><dd>Each side has one bishop, on opposite colours. Notoriously drawish in endgames, but a powerful attacking edge in the middlegame.</dd></div>
+            <div class="term"><dt>Opposition</dt><dd>A king-versus-king standoff a knight's move apart; the side <em>not</em> to move usually holds the advantage.</dd></div>
+            <div class="term"><dt>Outpost</dt><dd>An advanced square, ideally protected by a pawn and safe from enemy pawns — a dream home for a knight.</dd></div>
+            <div class="term"><dt>Overloading</dt><dd>Giving one piece too many defensive jobs, so removing or distracting it collapses the position.</dd></div>
+          </dl>
+        </section>
+
+        <!-- P -->
+        <section class="letter-group" id="letter-P">
+          <h3>P</h3>
+          <dl class="term-grid">
+            <div class="term"><dt>Passed Pawn</dt><dd>A pawn with no enemy pawns ahead of it on its own or adjacent files — nothing can stop it except pieces.</dd></div>
+            <div class="term"><dt>Pawn Chain</dt><dd>A diagonal row of pawns each defending the next; attack it at its <strong>base</strong>.</dd></div>
+            <div class="term"><dt>Pawn Storm</dt><dd>Rolling your pawns forward to pry open the shelter around the enemy king.</dd></div>
+            <div class="term"><dt>Pawn Structure</dt><dd>The overall skeleton of pawns, which dictates the plans and piece placement for both sides.</dd></div>
+            <div class="term"><dt>Perpetual Check</dt><dd>An unstoppable series of checks that repeats the position and forces a draw.</dd></div>
+            <div class="term"><dt>PGN</dt><dd><strong>Portable Game Notation</strong> — the standard text format for storing complete games (as exported by the Copy&nbsp;PGN button).</dd></div>
+            <div class="term"><dt>Pin</dt><dd>An attack in which a piece cannot move without exposing a more valuable one behind it. Against the king it is an <strong>absolute pin</strong> (illegal to move).</dd></div>
+            <div class="term"><dt>Ply</dt><dd>A single move by one side — half of a full move.</dd></div>
+            <div class="term"><dt>Prophylaxis</dt><dd>A move that quietly prevents the opponent's plan before you pursue your own.</dd></div>
+            <div class="term"><dt>Promotion</dt><dd>A pawn that reaches the last rank turns into a queen, rook, bishop, or knight.</dd></div>
+            <div class="term"><dt>Protected Passed Pawn</dt><dd>A passed pawn defended by another pawn — very hard to blockade or win.</dd></div>
+          </dl>
+        </section>
+
+        <!-- Q -->
+        <section class="letter-group" id="letter-Q">
+          <h3>Q</h3>
+          <dl class="term-grid">
+            <div class="term"><dt>Queenside</dt><dd>The half of the board on the a–d files.</dd></div>
+            <div class="term"><dt>Queenside Castling <span class="also">O-O-O</span></dt><dd>Castling toward the a-file; slower than kingside but places the rook on a central file.</dd></div>
+            <div class="term"><dt>Quiet Move</dt><dd>A non-forcing move — no check, capture, or immediate threat — that is often the surprising point of a combination.</dd></div>
+          </dl>
+        </section>
+
+        <!-- R -->
+        <section class="letter-group" id="letter-R">
+          <h3>R</h3>
+          <dl class="term-grid">
+            <div class="term"><dt>Rank</dt><dd>A horizontal row of squares, numbered 1 to 8.</dd></div>
+            <div class="term"><dt>Rapid</dt><dd>A medium time control, roughly 15–60 minutes per side.</dd></div>
+            <div class="term"><dt>Removing the Defender</dt><dd>Capturing or driving off the very piece that guards your target.</dd></div>
+            <div class="term"><dt>Repetition <span class="also">Threefold</span></dt><dd>If the same position (same pieces, same side to move, same rights) occurs three times, either player may claim a draw.</dd></div>
+            <div class="term"><dt>Rook Lift</dt><dd>Swinging a rook up and along a rank (e.g. Re1–e3–g3) to bring it into the attack.</dd></div>
+          </dl>
+        </section>
+
+        <!-- S -->
+        <section class="letter-group" id="letter-S">
+          <h3>S</h3>
+          <dl class="term-grid">
+            <div class="term"><dt>Sacrifice</dt><dd>Giving up material for a greater return — an attack, the initiative, or checkmate.</dd></div>
+            <div class="term"><dt>SAN</dt><dd><strong>Standard Algebraic Notation</strong>, the usual written form of moves (Nf3, exd5, O-O, Qxh7#).</dd></div>
+            <div class="term"><dt>Simplification</dt><dd>Trading pieces to reach a clearer, favourable position — a standard way to convert an advantage.</dd></div>
+            <div class="term"><dt>Skewer</dt><dd>Like a pin reversed: the more valuable piece stands in front and, when it moves, the piece behind it is captured.</dd></div>
+            <div class="term"><dt>Smothered Mate</dt><dd>A checkmate by a knight when the king is completely boxed in by its own pieces.</dd></div>
+            <div class="term"><dt>Space</dt><dd>The amount of the board your pawns and pieces control; more space means more freedom to manoeuvre.</dd></div>
+            <div class="term"><dt>Stalemate</dt><dd>The player to move has no legal move but is <em>not</em> in check — the game is drawn.</dd></div>
+            <div class="term"><dt>Swindle</dt><dd>Rescuing a lost position with a well-timed trick or trap.</dd></div>
+          </dl>
+        </section>
+
+        <!-- T -->
+        <section class="letter-group" id="letter-T">
+          <h3>T</h3>
+          <dl class="term-grid">
+            <div class="term"><dt>Tabiya</dt><dd>A well-known "standard" position that many games in an opening funnel into before real thinking begins.</dd></div>
+            <div class="term"><dt>Tempo</dt><dd>A unit of time equal to one move. You "gain a tempo" when you develop while making a threat the opponent must answer.</dd></div>
+            <div class="term"><dt>Threat</dt><dd>A move that, if allowed next, would win material or deliver mate.</dd></div>
+            <div class="term"><dt>Time Control</dt><dd>The clock rules for a game — a base time plus an optional <strong>increment</strong> added each move.</dd></div>
+            <div class="term"><dt>Touch-move</dt><dd>In serious play, if you touch one of your pieces you must move it (and a touched enemy piece must be captured if legal).</dd></div>
+            <div class="term"><dt>Transposition</dt><dd>Reaching the same position through a different order of moves.</dd></div>
+            <div class="term"><dt>Triangulation</dt><dd>A king manoeuvre that loses a single tempo on purpose to hand the opponent a losing <strong>zugzwang</strong>.</dd></div>
+          </dl>
+        </section>
+
+        <!-- U -->
+        <section class="letter-group" id="letter-U">
+          <h3>U</h3>
+          <dl class="term-grid">
+            <div class="term"><dt>Underpromotion</dt><dd>Promoting to something other than a queen — usually a knight for a fork or check, or a rook/bishop to avoid stalemate.</dd></div>
+            <div class="term"><dt>Undermining</dt><dd>Attacking the pawn or piece that supports an enemy structure so the whole thing falls.</dd></div>
+          </dl>
+        </section>
+
+        <!-- V -->
+        <section class="letter-group" id="letter-V">
+          <h3>V</h3>
+          <dl class="term-grid">
+            <div class="term"><dt>Variation</dt><dd>A particular branch of moves within an opening or a piece of analysis.</dd></div>
+          </dl>
+        </section>
+
+        <!-- W -->
+        <section class="letter-group" id="letter-W">
+          <h3>W</h3>
+          <dl class="term-grid">
+            <div class="term"><dt>Weak Square</dt><dd>A square that can no longer be guarded by a pawn — an invitation for an enemy piece.</dd></div>
+            <div class="term"><dt>Windmill</dt><dd>A repeating see-saw of discovered checks that mows down enemy material.</dd></div>
+          </dl>
+        </section>
+
+        <!-- X -->
+        <section class="letter-group" id="letter-X">
+          <h3>X</h3>
+          <dl class="term-grid">
+            <div class="term"><dt>X-ray</dt><dd>A piece's influence that passes "through" another piece on the same line — used to attack or to defend from behind.</dd></div>
+          </dl>
+        </section>
+
+        <!-- Z -->
+        <section class="letter-group" id="letter-Z">
+          <h3>Z</h3>
+          <dl class="term-grid">
+            <div class="term"><dt>Zugzwang <span class="also">German: "compulsion to move"</span></dt><dd>A position where you would love to pass — but every legal move makes things worse.</dd></div>
+            <div class="term"><dt>Zwischenzug</dt><dd>See <strong>In-between Move</strong> — an unexpected reply inserted before the expected one.</dd></div>
+          </dl>
+        </section>
+      </div>
+
+      <div class="content-footer">
+        Chess Coach Pro v1.0.0 — <a href="index.html">back to the board</a> ·
+        <a href="opening-systems.html">Opening Systems guide</a>
+      </div>
+    </main>
+
+    <script>
+      (function () {
+        var LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+        var body = document.getElementById('glossaryBody');
+        var jumpBar = document.getElementById('jumpBar');
+        var noResults = document.getElementById('noResults');
+        var search = document.getElementById('glossarySearch');
+
+        // Build the A–Z jump bar; letters with no terms are shown disabled.
+        LETTERS.forEach(function (L) {
+          var has = document.getElementById('letter-' + L);
+          var a = document.createElement('a');
+          a.textContent = L;
+          if (has) { a.href = '#letter-' + L; } else { a.className = 'disabled'; }
+          jumpBar.appendChild(a);
+        });
+
+        // Live filter across term titles + definitions.
+        search.addEventListener('input', function () {
+          var q = search.value.trim().toLowerCase();
+          var anyVisible = false;
+          var groups = body.querySelectorAll('.letter-group');
+          groups.forEach(function (group) {
+            var groupHasMatch = false;
+            group.querySelectorAll('.term').forEach(function (term) {
+              var text = term.textContent.toLowerCase();
+              var match = !q || text.indexOf(q) !== -1;
+              term.style.display = match ? '' : 'none';
+              if (match) { groupHasMatch = true; anyVisible = true; }
+            });
+            group.style.display = groupHasMatch ? '' : 'none';
+          });
+          noResults.classList.toggle('hidden', anyVisible);
+        });
+      })();
+    </script>
+  </body>
+</html>

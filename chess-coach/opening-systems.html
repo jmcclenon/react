@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Opening Systems — Chess Coach Pro</title>
+    <link rel="stylesheet" href="css/styles.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♞</text></svg>"
+    />
+  </head>
+  <body>
+    <header class="app-header">
+      <span class="logo">♞</span>
+      <h1>Chess Coach Pro <span class="version">v1.0.0</span></h1>
+      <nav class="app-nav">
+        <a href="index.html">Play</a>
+        <a href="glossary.html">Glossary</a>
+        <a href="opening-systems.html" class="active">Opening Systems</a>
+      </nav>
+    </header>
+
+    <main class="content">
+      <h1 style="margin:0 0 6px;font-size:26px">Opening Systems</h1>
+      <p class="lead">
+        A guided tour of the openings the coach and the AI personalities play —
+        grouped into three tiers by how much theory they demand. Start with the
+        <strong>Basic</strong> systems to build good habits, graduate to the
+        <strong>Moderate</strong> classics, then explore the sharp,
+        theory-heavy <strong>Advanced</strong> battlegrounds. Each entry gives
+        the idea behind the opening, the middlegame strategy for both sides, and
+        practical hints. Moves are shown in standard notation.
+      </p>
+
+      <!-- ============ BASIC ============ -->
+      <h2 class="section-title">
+        Basic systems <span class="tier-badge tier-basic">Beginner-friendly</span>
+      </h2>
+      <p class="section-note">
+        Principle-based openings that almost play themselves: fast development,
+        a solid centre, early castling. Easy to learn, hard to go wrong — the
+        best place to start.
+      </p>
+      <div class="opening-grid">
+
+        <article class="opening-card">
+          <div class="oc-head"><h3>Italian Game</h3><span class="eco">C50</span><span class="side-tag">White</span></div>
+          <div class="moves">1.e4 e5 2.Nf3 Nc6 3.Bc4</div>
+          <div class="block explain"><span class="label">Explanation</span><p>The most natural opening in chess: grab the centre, develop the knight with a threat, and aim the bishop straight at f7 — Black's most vulnerable square. The "Giuoco Piano" ("quiet game") that follows is calm and instructive.</p></div>
+          <div class="block strategy"><span class="label">Strategy</span><ul>
+            <li><strong>White:</strong> build the big centre with c3 and d4, castle, and play on the kingside.</li>
+            <li><strong>Black:</strong> mirror with …Bc5 or …Be7, …Nf6, …d6, and challenge the centre with …d5 when ready.</li>
+            <li>Fight for the d4/d5 break — whoever plays it well gets the freer game.</li>
+          </ul></div>
+          <div class="block hints"><span class="label">Hints</span><ul>
+            <li>Don't rush b4 or g4 lunges — finish developing first.</li>
+            <li>Watch the f7/f2 squares; a knight on g5 hitting f7 is the oldest trap in the book.</li>
+            <li>Aim for c3 + d4; it is the whole point of the bishop on c4.</li>
+          </ul></div>
+        </article>
+
+        <article class="opening-card">
+          <div class="oc-head"><h3>Scotch Game</h3><span class="eco">C45</span><span class="side-tag">White</span></div>
+          <div class="moves">1.e4 e5 2.Nf3 Nc6 3.d4</div>
+          <div class="block explain"><span class="label">Explanation</span><p>White strikes in the centre immediately, trading the d-pawn for the e-pawn to open the position and get pieces out fast. A great practical weapon that sidesteps heavy Ruy López theory.</p></div>
+          <div class="block strategy"><span class="label">Strategy</span><ul>
+            <li><strong>White:</strong> recapture on d4 with the knight, develop naturally, and enjoy easy piece play and a lead in development.</li>
+            <li><strong>Black:</strong> hit the d4-knight with …Nf6 and …Bb4/…Bc5, then free the game with …d5.</li>
+          </ul></div>
+          <div class="block hints"><span class="label">Hints</span><ul>
+            <li>After 3…exd4 4.Nxd4, don't be afraid to trade on c6 to damage Black's pawns.</li>
+            <li>Keep the queen safe — early …Qh4 or Qf6 ideas can cost you tempi if mishandled.</li>
+          </ul></div>
+        </article>
+
+        <article class="opening-card">
+          <div class="oc-head"><h3>Queen's Gambit</h3><span class="eco">D06</span><span class="side-tag">White</span></div>
+          <div class="moves">1.d4 d5 2.c4</div>
+          <div class="block explain"><span class="label">Explanation</span><p>Not a real gambit — if Black grabs the c4-pawn, White easily wins it back. White offers the c-pawn to deflect Black's d5-pawn and build a dominant centre. The backbone of classical chess.</p></div>
+          <div class="block strategy"><span class="label">Strategy</span><ul>
+            <li><strong>White:</strong> develop with Nc3, Nf3, Bg5/Bf4, e3, and use the extra central space; the <strong>minority attack</strong> (b4–b5) is a classic plan.</li>
+            <li><strong>Black (Declined, …e6):</strong> solid but slightly passive; free the light-squared bishop and aim for …c5 or …e5 breaks.</li>
+            <li><strong>Black (Accepted, …dxc4):</strong> give back the centre for quick development and …c5.</li>
+          </ul></div>
+          <div class="block hints"><span class="label">Hints</span><ul>
+            <li>Don't try to cling to the c4-pawn as Black — return it and develop.</li>
+            <li>As White, avoid playing e4 too early before you're fully developed.</li>
+          </ul></div>
+        </article>
+
+        <article class="opening-card">
+          <div class="oc-head"><h3>London System</h3><span class="eco">D02</span><span class="side-tag">White</span></div>
+          <div class="moves">1.d4 d5 2.Bf4 (or 2.Nf3 &amp; 3.Bf4)</div>
+          <div class="block explain"><span class="label">Explanation</span><p>A "system" you can play on autopilot against almost anything: the same easy setup every game — Bf4, e3, Nf3, Bd3, c3, Nbd2, and short castling. Low theory, rock-solid, and surprisingly venomous.</p></div>
+          <div class="block strategy"><span class="label">Strategy</span><ul>
+            <li><strong>White:</strong> complete the setup, then choose a plan — kingside attack with Ne5 + f4 + Qf3/Rf3, or a quiet queenside squeeze.</li>
+            <li><strong>Black:</strong> challenge the dark-squared bishop with …Bd6 or …Qb6 hitting b2, and strike with …c5.</li>
+          </ul></div>
+          <div class="block hints"><span class="label">Hints</span><ul>
+            <li>Play c3 before your knight blocks it, so b2 and the bishop stay defended.</li>
+            <li>The knight jump Ne5 is the heart of White's attacking plans.</li>
+            <li>Meet …Qb6 calmly with Qc1 or Qb3 — don't panic about b2.</li>
+          </ul></div>
+        </article>
+
+        <article class="opening-card">
+          <div class="oc-head"><h3>Scandinavian Defense</h3><span class="eco">B01</span><span class="side-tag">Black</span></div>
+          <div class="moves">1.e4 d5 2.exd5 Qxd5 3.Nc3 Qa5</div>
+          <div class="block explain"><span class="label">Explanation</span><p>Black challenges the e4-pawn on move one and reaches a clear, easy-to-understand position. You get the same structure nearly every game, which makes it a great first defence to 1.e4.</p></div>
+          <div class="block strategy"><span class="label">Strategy</span><ul>
+            <li><strong>Black:</strong> develop with …Nf6, …c6 (a safe home for the queen), …Bf5 or …Bg4, …e6 and castle. Solid and structurally sound.</li>
+            <li><strong>White:</strong> gain time chasing the queen, grab space with d4, and develop actively.</li>
+          </ul></div>
+          <div class="block hints"><span class="label">Hints</span><ul>
+            <li>Tuck the queen back to a5 or d6, and play …c6 to give it an escape square.</li>
+            <li>Develop the light-squared bishop <em>before</em> playing …e6 so it doesn't get trapped.</li>
+          </ul></div>
+        </article>
+
+        <article class="opening-card">
+          <div class="oc-head"><h3>Caro-Kann Defense</h3><span class="eco">B10</span><span class="side-tag">Black</span></div>
+          <div class="moves">1.e4 c6 2.d4 d5</div>
+          <div class="block explain"><span class="label">Explanation</span><p>A rock-solid answer to 1.e4. Like the French, Black challenges the centre with …d5 — but supports it with the c-pawn instead of the e-pawn, so the light-squared bishop stays free.</p></div>
+          <div class="block strategy"><span class="label">Strategy</span><ul>
+            <li><strong>Black:</strong> get the "good" bishop outside the pawn chain with …Bf5 or …Bg4, then …e6, …Nd7, and castle. Aim for a healthy structure and a safe endgame.</li>
+            <li><strong>White:</strong> choose Advance (e5), Exchange, or the Classical main lines to fight for space.</li>
+          </ul></div>
+          <div class="block hints"><span class="label">Hints</span><ul>
+            <li>Always develop the c8-bishop before locking it in with …e6.</li>
+            <li>The Caro rewards patience — you often win in the endgame thanks to the sounder pawns.</li>
+          </ul></div>
+        </article>
+      </div>
+
+      <!-- ============ MODERATE ============ -->
+      <h2 class="section-title">
+        Moderate systems <span class="tier-badge tier-moderate">Club level</span>
+      </h2>
+      <p class="section-note">
+        The great classical openings. They reward understanding over memorisation
+        but do have real theory and typical middlegame plans worth learning.
+      </p>
+      <div class="opening-grid">
+
+        <article class="opening-card">
+          <div class="oc-head"><h3>Ruy López (Spanish)</h3><span class="eco">C60</span><span class="side-tag">White</span></div>
+          <div class="moves">1.e4 e5 2.Nf3 Nc6 3.Bb5</div>
+          <div class="block explain"><span class="label">Explanation</span><p>The most respected 1.e4 e5 opening. The bishop pressures the knight that defends e5, posing long-term questions. Rich, strategic, and played at every level from club to world championship.</p></div>
+          <div class="block strategy"><span class="label">Strategy</span><ul>
+            <li><strong>White:</strong> after a6/Ba4, tuck the bishop to b3–c2 ("the Spanish bishop"), play c3 &amp; d4, and manoeuvre knights via Nbd2–f1–g3. A slow build toward a kingside attack.</li>
+            <li><strong>Black:</strong> the Closed lines (…Be7, …O-O, …d6, …Na5) or the sturdy Berlin (…Nf6) trade solidity for time.</li>
+          </ul></div>
+          <div class="block hints"><span class="label">Hints</span><ul>
+            <li>3…a6 (the Morphy) is the main move; it "puts the question" to the bishop.</li>
+            <li>Don't grab e5 too early — often it's a trap that loses the pawn back with interest.</li>
+            <li>Patience: the Ruy is a manoeuvring battle, not a shootout.</li>
+          </ul></div>
+        </article>
+
+        <article class="opening-card span-2">
+          <div class="oc-head"><h3>Sicilian Defense</h3><span class="eco">B20–B99</span><span class="side-tag">Black</span></div>
+          <div class="moves">1.e4 c5</div>
+          <div class="block explain"><span class="label">Explanation</span><p>The most popular and most combative answer to 1.e4. Instead of symmetry, Black fights for the centre with a flank pawn, unbalancing the game and playing for a win. It is a whole world of openings — the Najdorf, Dragon, Sveshnikov, Taimanov, Classical and more branch out from here.</p></div>
+          <div class="block strategy"><span class="label">Strategy</span><ul>
+            <li><strong>Black:</strong> trade the c-pawn for White's d-pawn, giving a half-open c-file for counterplay, then attack on the queenside while White attacks the king.</li>
+            <li><strong>White (Open, 2.Nf3 &amp; 3.d4):</strong> use the central and development lead to attack the king — often with f3, Be3, Qd2, O-O-O and a kingside pawn storm.</li>
+            <li><strong>White (Anti-Sicilians):</strong> the Alapin (2.c3), Closed (2.Nc3), or Grand Prix (f4) avoid heavy theory.</li>
+          </ul></div>
+          <div class="block hints"><span class="label">Hints</span><ul>
+            <li>It is a race: both sides castle on opposite wings and push pawns at each other's king. Count the tempi.</li>
+            <li>The half-open c-file is Black's highway — pile rooks and the queen on it.</li>
+            <li>If you don't want to memorise sharp theory, an Anti-Sicilian is a fine practical choice.</li>
+          </ul></div>
+        </article>
+
+        <article class="opening-card">
+          <div class="oc-head"><h3>French Defense</h3><span class="eco">C00</span><span class="side-tag">Black</span></div>
+          <div class="moves">1.e4 e6 2.d4 d5</div>
+          <div class="block explain"><span class="label">Explanation</span><p>A solid, strategic defence: Black challenges e4 straight away and accepts a slightly cramped but very sound position, with a clear plan of counterattacking White's centre.</p></div>
+          <div class="block strategy"><span class="label">Strategy</span><ul>
+            <li><strong>Black:</strong> undermine the centre with …c5 (and sometimes …f6), develop the kingside, and activate the famously "bad" c8-bishop.</li>
+            <li><strong>White:</strong> gain space (Advance e5), or open lines (Exchange/Tarrasch/Classical) and target the kingside.</li>
+          </ul></div>
+          <div class="block hints"><span class="label">Hints</span><ul>
+            <li>…c5 is almost always the key freeing break — prepare it and play it.</li>
+            <li>Solve the light-squared bishop early (…b6/…Ba6, or …Bd7–b5) so it doesn't stay a spectator.</li>
+          </ul></div>
+        </article>
+
+        <article class="opening-card">
+          <div class="oc-head"><h3>Slav Defense</h3><span class="eco">D10</span><span class="side-tag">Black</span></div>
+          <div class="moves">1.d4 d5 2.c4 c6</div>
+          <div class="block explain"><span class="label">Explanation</span><p>One of the soundest ways to meet the Queen's Gambit. Black supports d5 with the c-pawn (not the e-pawn), so the light-squared bishop keeps its freedom — a key improvement over the QGD.</p></div>
+          <div class="block strategy"><span class="label">Strategy</span><ul>
+            <li><strong>Black:</strong> develop the bishop to f5 or g4 <em>before</em> …e6, then complete development and look for …dxc4 followed by …b5 to hold the pawn or …c5/…e5 breaks.</li>
+            <li><strong>White:</strong> claim space, develop harmoniously, and pressure the queenside.</li>
+          </ul></div>
+          <div class="block hints"><span class="label">Hints</span><ul>
+            <li>The golden rule: get the c8-bishop out before you play …e6.</li>
+            <li>…dxc4 followed by …b5 grabs a pawn — but only when you can hold it; otherwise develop.</li>
+          </ul></div>
+        </article>
+
+        <article class="opening-card">
+          <div class="oc-head"><h3>English Opening</h3><span class="eco">A10</span><span class="side-tag">White</span></div>
+          <div class="moves">1.c4</div>
+          <div class="block explain"><span class="label">Explanation</span><p>A flexible flank opening: White fights for d5 from the side and often fianchettoes the king's bishop. It frequently transposes into Queen's Pawn structures, so it pairs well with 1.d4.</p></div>
+          <div class="block strategy"><span class="label">Strategy</span><ul>
+            <li><strong>White:</strong> play g3, Bg2, Nc3, Nf3 and control the centre with pieces; expand with b4 on the queenside or d4 in the centre when it suits.</li>
+            <li><strong>Black:</strong> stake a central claim with …e5 (a "reversed Sicilian") or …d5, or play symmetrically with …c5.</li>
+          </ul></div>
+          <div class="block hints"><span class="label">Hints</span><ul>
+            <li>The g2-bishop is your best piece — build the position around its long diagonal.</li>
+            <li>Stay flexible; the English rewards good move-order sense over rote memory.</li>
+          </ul></div>
+        </article>
+
+        <article class="opening-card">
+          <div class="oc-head"><h3>King's Indian Attack</h3><span class="eco">A07</span><span class="side-tag">White</span></div>
+          <div class="moves">1.Nf3, g3, Bg2, O-O, d3, Nbd2, e4</div>
+          <div class="block explain"><span class="label">Explanation</span><p>A "system" like the London but for White with the king's bishop fianchettoed: the same reliable setup versus almost any Black reply. Low theory, and it channels into a thematic kingside attack.</p></div>
+          <div class="block strategy"><span class="label">Strategy</span><ul>
+            <li><strong>White:</strong> complete the setup, play e4–e5 to gain space, then storm the kingside with Nf1–h2/g4, and pawns to h4/f4.</li>
+            <li><strong>Black:</strong> expand on the queenside where White is not attacking, and race for counterplay.</li>
+          </ul></div>
+          <div class="block hints"><span class="label">Hints</span><ul>
+            <li>The e5-push is the signal to switch on the kingside attack.</li>
+            <li>Reroute the d2-knight via f1 to g3 or e3 to join the assault.</li>
+          </ul></div>
+        </article>
+      </div>
+
+      <!-- ============ ADVANCED ============ -->
+      <h2 class="section-title">
+        Advanced systems <span class="tier-badge tier-advanced">Theory-heavy</span>
+      </h2>
+      <p class="section-note">
+        Sharp, deeply analysed openings where concrete knowledge matters. Hugely
+        rewarding — and what the Grandmaster personalities will throw at you — but
+        best tackled once the fundamentals are second nature.
+      </p>
+      <div class="opening-grid">
+
+        <article class="opening-card">
+          <div class="oc-head"><h3>Sicilian Najdorf</h3><span class="eco">B90</span><span class="side-tag">Black</span></div>
+          <div class="moves">1.e4 c5 2.Nf3 d6 3.d4 cxd4 4.Nxd4 Nf6 5.Nc3 a6</div>
+          <div class="block explain"><span class="label">Explanation</span><p>The most famous and most analysed opening in chess — Fischer and Kasparov's weapon. The little move 5…a6 is deeply flexible: it prepares …e5 or …e6, controls b5, and waits to see White's plan.</p></div>
+          <div class="block strategy"><span class="label">Strategy</span><ul>
+            <li><strong>Black:</strong> counterattack on the queenside and centre; typical plans include …e5 kicking the knight, …b5–b4, and pressure down the c-file.</li>
+            <li><strong>White:</strong> pick a poison — the English Attack (Be3, f3, Qd2, O-O-O, g4), 6.Bg5, or the quiet 6.Be2. Most lines aim to storm the black king.</li>
+          </ul></div>
+          <div class="block hints"><span class="label">Hints</span><ul>
+            <li>Know your specific line — the Najdorf punishes vague play with a quick attack.</li>
+            <li>Time your …e5/…e6 and …b5 breaks precisely; a tempo often decides the race.</li>
+          </ul></div>
+        </article>
+
+        <article class="opening-card">
+          <div class="oc-head"><h3>King's Indian Defense</h3><span class="eco">E60–E99</span><span class="side-tag">Black</span></div>
+          <div class="moves">1.d4 Nf6 2.c4 g6 3.Nc3 Bg7 4.e4 d6</div>
+          <div class="block explain"><span class="label">Explanation</span><p>A fighting hypermodern defence: Black lets White build a huge pawn centre, then attacks it with pieces and a kingside pawn storm. Uncompromising and double-edged — you play for the win with Black.</p></div>
+          <div class="block strategy"><span class="label">Strategy</span><ul>
+            <li><strong>Black:</strong> castle, play …e5, and if the centre locks, launch …f5–f4–g5–g4 straight at White's king. It's a thematic mating attack.</li>
+            <li><strong>White:</strong> expand on the queenside with c5 and b4–b5 and try to break through before Black's kingside storm arrives.</li>
+          </ul></div>
+          <div class="block hints"><span class="label">Hints</span><ul>
+            <li>Opposite-wing races: don't get distracted defending — push your attack faster than the opponent pushes theirs.</li>
+            <li>Once the centre is closed, the …f5 break is your green light on the kingside.</li>
+          </ul></div>
+        </article>
+
+        <article class="opening-card">
+          <div class="oc-head"><h3>Grünfeld Defense</h3><span class="eco">D80</span><span class="side-tag">Black</span></div>
+          <div class="moves">1.d4 Nf6 2.c4 g6 3.Nc3 d5</div>
+          <div class="block explain"><span class="label">Explanation</span><p>The ultimate hypermodern statement: Black invites White to occupy the centre, then chips away at it. After cxd5 Nxd5 and the exchange on c3, White gets a big pawn centre that Black targets with …c5, …Bg7, and heavy piece pressure.</p></div>
+          <div class="block strategy"><span class="label">Strategy</span><ul>
+            <li><strong>Black:</strong> pressure d4 and the whole centre with …c5, …Nc6/…Bg4, …Qa5 and the g7-bishop raking the long diagonal.</li>
+            <li><strong>White:</strong> prove the centre is a strength — support it, develop actively (Be3, Rc1, Qd2), and push for a space-based attack.</li>
+          </ul></div>
+          <div class="block hints"><span class="label">Hints</span><ul>
+            <li>Black's whole plan is "attack the centre" — every piece should hit d4 or c3.</li>
+            <li>As White, if the centre falls apart you're worse; keep it defended and mobile.</li>
+          </ul></div>
+        </article>
+
+        <article class="opening-card">
+          <div class="oc-head"><h3>Nimzo-Indian Defense</h3><span class="eco">E20</span><span class="side-tag">Black</span></div>
+          <div class="moves">1.d4 Nf6 2.c4 e6 3.Nc3 Bb4</div>
+          <div class="block explain"><span class="label">Explanation</span><p>One of the most respected defences to 1.d4. The pin on the c3-knight fights for the centre with pieces and often doubles White's pawns, trading the bishop pair for lasting structural targets.</p></div>
+          <div class="block strategy"><span class="label">Strategy</span><ul>
+            <li><strong>Black:</strong> often play …Bxc3 to give White doubled c-pawns, then blockade them with …c5, …Nc6/…Na5, …d6 and …e5, working the light squares.</li>
+            <li><strong>White:</strong> use the bishop pair and the open lines; play for e4 and a central/kingside initiative to prove dynamism beats structure.</li>
+          </ul></div>
+          <div class="block hints"><span class="label">Hints</span><ul>
+            <li>Only trade …Bxc3 when it inflicts real structural damage — otherwise the bishop is precious.</li>
+            <li>The battle is bishop pair &amp; centre (White) versus superior structure &amp; blockade (Black).</li>
+          </ul></div>
+        </article>
+
+        <article class="opening-card">
+          <div class="oc-head"><h3>Catalan Opening</h3><span class="eco">E00</span><span class="side-tag">White</span></div>
+          <div class="moves">1.d4 Nf6 2.c4 e6 3.g3 d5 4.Bg2</div>
+          <div class="block explain"><span class="label">Explanation</span><p>A Queen's Gambit with the bishop fianchettoed on g2 — combining classical central pressure with a monster long-diagonal bishop. Elite players love its blend of safety and lasting pressure.</p></div>
+          <div class="block strategy"><span class="label">Strategy</span><ul>
+            <li><strong>White:</strong> apply slow, grinding pressure down the long diagonal and the c-file; often willing to gambit the c4-pawn for a durable positional bind.</li>
+            <li><strong>Black:</strong> either hold the c4-pawn with …dxc4 and …b5, or free the game with …c5 and a timely …dxc4 to open lines for the pieces.</li>
+          </ul></div>
+          <div class="block hints"><span class="label">Hints</span><ul>
+            <li>The g2-bishop is the soul of the opening — never trade it lightly.</li>
+            <li>The Catalan is a marathon: small, lasting pressure that grinds opponents down.</li>
+          </ul></div>
+        </article>
+
+        <article class="opening-card">
+          <div class="oc-head"><h3>Semi-Slav Defense</h3><span class="eco">D43</span><span class="side-tag">Black</span></div>
+          <div class="moves">1.d4 d5 2.c4 e6 3.Nf3 Nf6 4.Nc3 c6</div>
+          <div class="block explain"><span class="label">Explanation</span><p>A hyper-solid yet razor-sharp hybrid of the Slav and QGD — Black supports d5 with both …e6 and …c6. It leads to some of the most theory-drenched battlegrounds in chess (the Meran and Botvinnik systems).</p></div>
+          <div class="block strategy"><span class="label">Strategy</span><ul>
+            <li><strong>Black:</strong> aim for the …dxc4 and …b5 expansion (Meran) to free the bishop and grab queenside space, or the wild pawn-grabbing Botvinnik lines.</li>
+            <li><strong>White:</strong> choose between quiet pressure and the sharp 5.Bg5 gambits; central control and development lead the way.</li>
+          </ul></div>
+          <div class="block hints"><span class="label">Hints</span><ul>
+            <li>These lines are concrete — study the specific variation you intend to play.</li>
+            <li>The freeing …c5 break (after …b5 and development) is a recurring goal for Black.</li>
+          </ul></div>
+        </article>
+
+        <article class="opening-card">
+          <div class="oc-head"><h3>King's Gambit</h3><span class="eco">C30</span><span class="side-tag">White</span></div>
+          <div class="moves">1.e4 e5 2.f4</div>
+          <div class="block explain"><span class="label">Explanation</span><p>The great romantic gambit. White sacrifices the f-pawn to rip open the centre and the f-file for a direct attack. Objectively risky, but a fantastic way to learn attacking chess — and dangerous in a real game.</p></div>
+          <div class="block strategy"><span class="label">Strategy</span><ul>
+            <li><strong>White:</strong> after 2…exf4, develop fast (Nf3, Bc4, O-O, d4) and use the open f-file and lead in development to attack f7 and the king.</li>
+            <li><strong>Black:</strong> either hold the extra pawn carefully (…g5 lines) or return it with …d5 for free, healthy development.</li>
+          </ul></div>
+          <div class="block hints"><span class="label">Hints</span><ul>
+            <li>As White, development and initiative are everything — never play to just "win the pawn back."</li>
+            <li>As Black, …d5! at the right moment defuses the attack and equalises comfortably.</li>
+          </ul></div>
+        </article>
+      </div>
+
+      <div class="content-footer">
+        Chess Coach Pro v1.0.0 — <a href="index.html">back to the board</a> ·
+        <a href="glossary.html">Chess Glossary</a>. Pick an opponent's
+        <em>Scouting Report</em> in the app to see which of these each AI plays.
+      </div>
+    </main>
+  </body>
+</html>
