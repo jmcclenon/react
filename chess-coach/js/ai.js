@@ -270,21 +270,35 @@
       if (_wpf[f] > 0) {
         var wr = _wpMin[f]; // smaller rank = more advanced for White
         var lf = f === 0 ? 8 : _bpMin[f - 1], mf = _bpMin[f], rf2 = f === 7 ? 8 : _bpMin[f + 1];
-        if (lf >= wr && mf >= wr && rf2 >= wr) positional += 12 + (6 - wr) * 8;
+        if (lf >= wr && mf >= wr && rf2 >= wr) {
+          positional += 12 + (6 - wr) * 8;
+          // Connected/supported passer: a neighbouring friendly pawn helps it advance.
+          if ((f > 0 && _wpf[f - 1] > 0) || (f < 7 && _wpf[f + 1] > 0)) positional += 15;
+        }
       }
       // Black passed pawn.
       if (_bpf[f] > 0) {
         var br = _bpMax[f]; // larger rank = more advanced for Black
         var lfb = f === 0 ? -1 : _wpMax[f - 1], mfb = _wpMax[f], rfb = f === 7 ? -1 : _wpMax[f + 1];
-        if (lfb <= br && mfb <= br && rfb <= br) positional -= 12 + (br - 1) * 8;
+        if (lfb <= br && mfb <= br && rfb <= br) {
+          positional -= 12 + (br - 1) * 8;
+          if ((f > 0 && _bpf[f - 1] > 0) || (f < 7 && _bpf[f + 1] > 0)) positional -= 15;
+        }
       }
     }
 
-    // Rooks on open / semi-open files.
+    // Rooks on open / semi-open files, and on the 7th rank.
     for (i = 0; i < 64; i++) {
       p = board[i];
-      if (p === 'R') { f = i & 7; if (_wpf[f] === 0) positional += _bpf[f] === 0 ? 20 : 10; }
-      else if (p === 'r') { f = i & 7; if (_bpf[f] === 0) positional -= _wpf[f] === 0 ? 20 : 10; }
+      if (p === 'R') {
+        f = i & 7;
+        if (_wpf[f] === 0) positional += _bpf[f] === 0 ? 20 : 10;
+        if ((i >> 3) === 1) positional += 24; // rook on the 7th rank
+      } else if (p === 'r') {
+        f = i & 7;
+        if (_bpf[f] === 0) positional -= _wpf[f] === 0 ? 20 : 10;
+        if ((i >> 3) === 6) positional -= 24;
+      }
     }
 
     // King safety: pawn shield on the king's file and neighbours (middlegame).
@@ -619,9 +633,12 @@
     var kingBefore = chess.kingIndex(color);
     for (var i = 0; i < caps.length; i++) {
       var m = caps[i];
-      // SEE pruning: skip captures that lose material by the exchange (a
-      // promotion capture is always tried — its value isn't captured material).
-      if (m.captured && !m.promotion && see(chess, m) < 0) continue;
+      if (m.captured && !m.promotion) {
+        // Delta pruning: even winning this capture outright can't reach alpha.
+        if (standPat + PIECE_VALUE[typeOf(m.captured)] + 150 < alpha) continue;
+        // SEE pruning: skip captures that lose material by the exchange.
+        if (see(chess, m) < 0) continue;
+      }
       var undo = chess._makeMove(m);
       var ks = typeOf(m.piece) === 'k' ? m.to : kingBefore;
       if (chess.isSquareAttacked(ks, enemy)) { chess._undoMove(undo); continue; }
@@ -668,16 +685,34 @@
     // Check extension: search one ply deeper when in check (tactics/mates).
     if (inCheck) depth++;
 
-    // Null-move pruning: if we can "pass" and still be >= beta at reduced depth,
-    // this node is so good it can be pruned. Skipped in check, in likely-
-    // zugzwang endgames (no non-pawn material), and near mate bounds.
-    if (!inCheck && depth >= 3 && beta < MATE - 1000 && beta > -(MATE - 1000) && this.hasNonPawn(chess, color)) {
-      var un = chess.makeNullMove();
-      var R = depth > 6 ? 3 : 2;
-      var nullScore = -this.negamax(chess, depth - 1 - R, -beta, -beta + 1, enemy, ply + 1);
-      chess.undoNullMove(un);
-      if (this.timedOut) return alpha;
-      if (nullScore >= beta) return beta;
+    var pvNode = beta - alpha > 1;
+    var nearMate = beta > MATE - 1000 || beta < -(MATE - 1000) || alpha > MATE - 1000 || alpha < -(MATE - 1000);
+    // Static evaluation (side-to-move perspective), used by the pruning
+    // heuristics below. Only needed when we're not in check.
+    var stand = inCheck ? 0 : (color === 'w' ? evaluate(chess, this.style) : -evaluate(chess, this.style));
+
+    if (!inCheck && !pvNode && !nearMate) {
+      // Reverse futility / static null-move pruning: if the static eval already
+      // beats beta by a wide margin, this node is almost certainly a cutoff.
+      if (depth <= 6 && stand - 80 * depth >= beta) return stand;
+
+      // Razoring: at low depth, if the eval is far below alpha, verify with a
+      // quiescence search and fail low if it confirms.
+      if (depth <= 3 && stand + 200 + 150 * depth <= alpha) {
+        var rq = this.quiescence(chess, alpha, beta, color);
+        if (rq <= alpha) return rq;
+      }
+
+      // Null-move pruning: give the opponent a free move; if we're still >= beta
+      // at reduced depth, prune. Requires non-pawn material (avoids zugzwang).
+      if (depth >= 3 && stand >= beta && this.hasNonPawn(chess, color)) {
+        var un = chess.makeNullMove();
+        var R = depth > 6 ? 3 : 2;
+        var nullScore = -this.negamax(chess, depth - 1 - R, -beta, -beta + 1, enemy, ply + 1);
+        chess.undoNullMove(un);
+        if (this.timedOut) return alpha;
+        if (nullScore >= beta) return beta;
+      }
     }
 
     // Pseudo-legal moves, ordered; legality is verified lazily below so a beta
@@ -686,8 +721,20 @@
     this.orderMoves(moves, ttMove, ply);
 
     var best = -Infinity, bestMove = null, legal = 0;
+    var canPrune = !inCheck && !pvNode && !nearMate;
     for (var i = 0; i < moves.length; i++) {
       var m = moves[i];
+      var quiet = !m.captured && !m.promotion;
+
+      // Move-count & futility pruning of hopeless quiet moves (skipped before
+      // making the move). Only once at least one legal move has been searched.
+      if (canPrune && quiet && legal >= 1) {
+        // Late-move pruning: at low depth, skip quiet moves ordered very late.
+        if (depth <= 3 && legal > 3 + depth * depth) continue;
+        // Futility: a quiet move that can't lift the static eval to alpha.
+        if (depth <= 6 && stand + 90 + 70 * depth <= alpha) continue;
+      }
+
       var undo = chess._makeMove(m);
       var ks = typeOf(m.piece) === 'k' ? m.to : kingBefore;
       if (chess.isSquareAttacked(ks, enemy)) { // move leaves own king in check
@@ -695,14 +742,18 @@
         continue;
       }
       legal++;
-      var quiet = !m.captured && !m.promotion;
       var score;
       if (legal === 1) {
         score = -this.negamax(chess, depth - 1, -beta, -alpha, enemy, ply + 1);
       } else {
         // Late-move reduction: search quiet, late moves shallower first.
         var red = 0;
-        if (quiet && !inCheck && depth >= 3 && legal > 3) red = legal > 6 ? 2 : 1;
+        if (quiet && !inCheck && depth >= 3 && legal >= 4) {
+          red = 1;
+          if (legal >= 8) red = 2;
+          if (depth >= 7 && legal >= 12) red = 3;
+          if (pvNode && red > 0) red--; // reduce less on the principal variation
+        }
         score = -this.negamax(chess, depth - 1 - red, -alpha - 1, -alpha, enemy, ply + 1);
         if (red > 0 && score > alpha && !this.timedOut) {
           score = -this.negamax(chess, depth - 1, -alpha - 1, -alpha, enemy, ply + 1);
