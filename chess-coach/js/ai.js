@@ -945,6 +945,7 @@
   AI.evaluate = evaluate;
   AI.PIECE_VALUE = PIECE_VALUE;
   AI.MATE = MATE;
+  AI.see = see; // static exchange evaluation, reused by the coach
 
   global.ChessAI = AI;
 })(typeof window !== 'undefined' ? window : this);

@@ -103,8 +103,16 @@ Six levels, each with its own search depth, thinking-time budget, and
   library (weighted by style) before the search takes over.
 - **Player profile**: name, nickname, and "member since" date, alongside your
   Elo rating, record, and rating-history graph — all saved locally.
-- **Coach** (`coach.js`): an opening book keyed by move sequence plus a
-  principle engine and a centipawn-loss move classifier.
+- **Coach** (`coach.js`): a professional review engine. It grades every move
+  (Brilliant / Great / Best / Excellent / Good / Book / Inaccuracy / Mistake /
+  Miss / Blunder) and explains *why* in concrete terms — naming the piece and
+  square that hangs, the tactic a move allows, the winning move or forced mate
+  that was missed, and phase-aware positional notes (development, king safety,
+  open files, passed pawns, king activity). It warns you about the opponent's
+  immediate threats before you move (using a null-move probe + SEE), recognizes
+  openings from a 100+ line library, and produces an end-of-game **Game Review**
+  with accuracy scores for both sides, a breakdown of move quality, and the
+  game's turning point.
 
 ## Running it
 

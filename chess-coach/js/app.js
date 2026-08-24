@@ -433,6 +433,61 @@
 
     // Advance the tournament match, if one is in progress.
     if (state.match && !state.match.over) recordMatchResult(humanResult);
+
+    // Show the end-of-game review (deferred slightly so any pending move
+    // annotation from the final move has settled).
+    setTimeout(renderGameReview, 450);
+  }
+
+  // ---- End-of-game review panel -----------------------------------------
+  function renderGameReview() {
+    var rev = state.coach.gameReview(state.records, state.humanColor);
+    var panel = $('reviewPanel');
+    panel.classList.remove('hidden');
+    $('revYouName').textContent = humanName();
+    $('revOppName').textContent = aiName();
+    $('revYouAcc').textContent = rev.humanAccuracy + '%';
+    $('revOppAcc').textContent = rev.oppAccuracy + '%';
+
+    var order = [
+      ['brilliant', 'Brilliant', '‼'], ['great', 'Great', '!'], ['best', 'Best', '★'],
+      ['excellent', 'Excellent', ''], ['good', 'Good', ''], ['book', 'Book', '📖'],
+      ['inaccuracy', 'Inaccuracy', '?!'], ['mistake', 'Mistake', '?'],
+      ['miss', 'Miss', '✗'], ['blunder', 'Blunder', '??'],
+    ];
+    var counts = $('revCounts');
+    counts.innerHTML = '';
+    order.forEach(function (o) {
+      var n = rev.counts[o[0]] || 0;
+      if (!n) return;
+      var chip = document.createElement('span');
+      chip.className = 'rev-chip q-' + o[0];
+      chip.textContent = (o[2] ? o[2] + ' ' : '') + o[1] + ' ' + n;
+      counts.appendChild(chip);
+    });
+
+    var moments = $('revMoments');
+    moments.innerHTML = '';
+    function moment(html, ply) {
+      var d = document.createElement('div');
+      d.className = 'rev-moment';
+      d.innerHTML = html;
+      if (ply != null) {
+        d.classList.add('clickable');
+        d.addEventListener('click', function () { navTo(ply + 1); });
+      }
+      moments.appendChild(d);
+    }
+    if (rev.best) {
+      moment('<strong>Best moment:</strong> your ' + rev.best.type + ' move <strong>' + rev.best.san + '</strong> (move ' + (Math.floor(rev.best.ply / 2) + 1) + ').', rev.best.ply);
+    }
+    if (rev.worst) {
+      var bt = rev.worst.better ? ' — ' + rev.worst.better + ' was stronger' : '';
+      moment('<strong>Turning point:</strong> ' + rev.worst.san + ' (move ' + (Math.floor(rev.worst.ply / 2) + 1) + ') cost about ' + (rev.worst.cp / 100).toFixed(1) + ' pawns' + bt + '. Click to review.', rev.worst.ply);
+    }
+    if (!rev.best && !rev.worst) {
+      moment('A clean game — no serious mistakes. Well played!');
+    }
   }
 
   function resetRating() {
@@ -791,6 +846,7 @@
     state.assistedThisGame = false;
     state.resultApplied = false;
     coachLog.length = 0;
+    $('reviewPanel').classList.add('hidden');
 
     state.clockMs = {
       w: state.baseMinutes * 60000,
@@ -1346,54 +1402,112 @@
 
     render();
 
-    // Grade the move against the pre-move analysis (centipawn loss vs best).
-    classifyRecorded(rec, pre, isHuman);
+    var over = checkGameEnd();
 
-    if (checkGameEnd()) return;
+    // Analyze the resulting position first (fast), then — since that analysis is
+    // the position the engine will move from — schedule the AI reply. This keeps
+    // preMoveAnalysis correct for the next mover and lets the coach see what the
+    // move just played allowed.
+    annotateMove(rec, pre, isHuman, over);
 
-    if (state.game.turn !== state.humanColor) {
+    if (!over && state.game.turn !== state.humanColor) {
       scheduleAiMove();
     }
-    // Analyze the new position for the eval bar, hints, and next move's grading.
-    refreshAnalysis();
   }
 
-  // Locate the played move within a pre-move analysis' ranked candidate list.
-  function findRanked(pre, rec) {
-    if (!pre || !pre.ranked) return null;
-    var wantPromo = rec.move.promotion || null;
-    for (var i = 0; i < pre.ranked.length; i++) {
-      var e = pre.ranked[i];
-      if (e.from === rec.move.from && e.to === rec.move.to && (e.promotion || null) === wantPromo) {
-        return {entry: e, rank: i};
-      }
-    }
-    return null;
-  }
-
-  function classifyRecorded(rec, pre, isHuman) {
-    var quality;
-    var plyIndex0 = state.records.indexOf(rec);
-    // A move that keeps the game in known opening theory is a "Book" move — a
-    // shallow analyzer shouldn't flag principled book moves as inaccuracies.
-    var sansThrough = state.records.slice(0, plyIndex0 + 1).map(function (r) { return r.san; });
-    var inBook = window.ChessOpenings.lookup(sansThrough).inBook;
-    if (inBook) {
-      quality = {label: 'Book', type: 'book', cp: 0};
-    } else {
-      var found = findRanked(pre, rec);
-      if (found) {
-        var cpLoss = pre.ranked[0].score - found.entry.score;
-        quality = state.coach.classifyLoss(cpLoss, found.rank === 0);
-      } else {
-        quality = {label: 'Good', type: 'good', cp: 0};
-      }
-    }
+  // Analyze the position after `rec`, then grade + explain the move with the
+  // professional coach (using both the pre-move and post-move analysis).
+  function annotateMove(rec, pre, isHuman, over) {
+    var gen = state.searchGen;
     var plyIndex = state.records.indexOf(rec);
-    if (plyIndex >= 0) state.records[plyIndex].quality = quality;
-    renderMoves();
-    if (isHuman && state.coachEnabled) coachOnHumanMove(rec, quality);
-    renderCoach();
+    var beforeFen = state.positions[plyIndex];
+    var afterFen = state.positions[plyIndex + 1];
+    var sansThrough = state.records.slice(0, plyIndex + 1).map(function (r) { return r.san; });
+    var inBook = window.ChessOpenings.lookup(sansThrough).inBook;
+
+    function apply(after) {
+      var ann;
+      if (over) {
+        var g = state.game;
+        if (g.isCheckmate()) ann = {type: 'best', label: 'Checkmate', glyph: '#', cp: 0, headline: '', details: [], better: null, evalWhite: g.turn === 'w' ? -ChessAI.MATE : ChessAI.MATE};
+        else ann = {type: 'good', label: 'Draw', glyph: '', cp: 0, headline: '', details: [], better: null, evalWhite: 0};
+      } else {
+        ann = state.coach.annotate({
+          beforeFen: beforeFen, afterFen: afterFen, rec: rec,
+          analysisBefore: pre, analysisAfter: after,
+          moverColor: rec.color, plyCount: plyIndex + 1, inBook: inBook, over: false,
+        });
+      }
+      if (plyIndex >= 0) {
+        state.records[plyIndex].quality = ann;
+        state.records[plyIndex].evalWhite = ann.evalWhite;
+      }
+      renderMoves();
+      if (isHuman && state.coachEnabled) pushCoachAnnotation(ann);
+      renderCoach();
+      if (state.gameOver) renderGameReview();
+    }
+
+    // No post-move analysis available/needed (game over, or a fully-unassisted
+    // rated game) — annotate with what we have.
+    if (over || (!state.analysisEnabled && !state.coachEnabled)) {
+      state.preMoveAnalysis = null;
+      if (over && state.analysisEnabled) {
+        var g2 = state.game;
+        setEvalBar(g2.isCheckmate() ? (g2.turn === 'w' ? -ChessAI.MATE : ChessAI.MATE) : 0, true);
+        $('analysisLines').innerHTML = '';
+      }
+      apply(null);
+      return;
+    }
+
+    if (state.analysisEnabled) $('analysisStatus').classList.add('hidden');
+    engine.requestAnalyze({fen: afterFen, depth: 4}, function (after) {
+      if (gen !== state.searchGen || !after) return;
+      state.preMoveAnalysis = after;
+      state.lastEvalWhite = after.whiteScore;
+      if (state.analysisEnabled) {
+        setEvalBar(after.whiteScore, true);
+        renderAnalysisLines(after);
+      }
+      apply(after);
+      // Warn the human about the opponent's threats before they move.
+      if (state.coachEnabled && !state.gameOver && state.game.turn === state.humanColor) {
+        requestThreatAlert(gen);
+      }
+    });
+  }
+
+  // Turn a coach annotation into panel messages (only when it's worth saying).
+  function pushCoachAnnotation(ann) {
+    if (!ann) return;
+    var typeMap = {brilliant: 'good', great: 'good', best: 'good', excellent: 'good', good: 'good', book: 'good', inaccuracy: 'warn', mistake: 'warn', miss: 'warn', blunder: 'blunder'};
+    var always = {brilliant: 1, great: 1, miss: 1, inaccuracy: 1, mistake: 1, blunder: 1, book: 1};
+    var hasDetail = ann.details && ann.details.length > 0;
+    if (!always[ann.type] && !hasDetail) return; // stay quiet on unremarkable moves
+    var title = ann.label + (ann.glyph && ann.glyph !== '📖' && ann.glyph !== '' ? ' ' + ann.glyph : '');
+    var text = ann.headline || '';
+    (ann.details || []).forEach(function (d) { text += (text ? ' ' : '') + d; });
+    if (text) addCoachMessage(typeMap[ann.type] || 'good', title, text);
+  }
+
+  // Detect and warn about the opponent's immediate threat on the human's turn.
+  function requestThreatAlert(gen) {
+    var g = state.game;
+    var enemy = state.humanColor === 'w' ? 'b' : 'w';
+    if (g.isSquareAttacked(g.kingIndex(state.humanColor), enemy)) {
+      addCoachMessage('warn', 'You\'re in check', 'Get your king out of check — block, capture the checking piece, or move the king.');
+      return;
+    }
+    var undo = g.makeNullMove();
+    var nfen = g.fen();
+    g.undoNullMove(undo);
+    var curWhite = state.lastEvalWhite;
+    engine.requestAnalyze({fen: nfen, depth: 3}, function (res) {
+      if (gen !== state.searchGen || !res || state.gameOver || state.game.turn !== state.humanColor) return;
+      var threat = state.coach.detectThreat(nfen, res, curWhite, state.humanColor);
+      if (threat) addCoachMessage('warn', 'Threat', threat);
+    });
   }
 
   function checkGameEnd() {
@@ -1440,7 +1554,6 @@
     setStatus('<span class="thinking">' + aiName() + ' is thinking…</span>');
 
     var gen = state.searchGen;
-    var pre = state.preMoveAnalysis;
     var spec = state.ai.specialist ? selectedSpecialistOpening() : null;
     // The worker can afford a longer think without freezing the UI.
     var base = state.ai.level.timeMs;
@@ -1456,6 +1569,11 @@
       state.aiThinking = false;
       if (state.gameOver) return;
       if (!move) { checkGameEnd(); return; }
+      // Captured now (not at request time): by the time the move returns, the
+      // post-opponent-move analysis has completed, so preMoveAnalysis is the
+      // analysis of the very position the AI just moved from — correct for
+      // grading the AI's move.
+      var pre = state.preMoveAnalysis;
       var rec = state.game.move({from: move.from, to: move.to, promotion: move.promotion ? Chess.typeOf(move.promotion) : null});
       if (!rec) { checkGameEnd(); return; }
       setStatus('');
@@ -1518,34 +1636,6 @@
       line.appendChild(cp);
       wrap.appendChild(line);
     });
-  }
-
-  function coachOnHumanMove(rec, quality) {
-    // Move-quality feedback
-    var beforeChess = new Chess(state.positions[state.viewPly - 1]);
-    var qType = quality.type;
-    if (qType === 'blunder') {
-      addCoachMessage('blunder', 'Blunder', 'That move loses significant material or position. ' + suggestBetter() + ' Try the Hint button before moving when unsure.');
-    } else if (qType === 'mistake') {
-      addCoachMessage('warn', 'Mistake', 'There was a clearly better option here. ' + suggestBetter());
-    } else if (qType === 'inaccuracy') {
-      addCoachMessage('warn', 'Inaccuracy', 'A slightly better move was available. ' + suggestBetter());
-    } else if (qType === 'best') {
-      addCoachMessage('good', 'Best move', 'That\'s the engine\'s top choice — excellent.');
-    } else if (qType === 'book') {
-      var lib = window.ChessOpenings.lookup(state.records.slice(0, state.viewPly).map(function (r) { return r.san; })).opening;
-      addCoachMessage('good', 'Book move', lib ? 'A known theoretical move — this is the ' + lib.name + '.' : 'A recognized opening move.');
-    }
-
-    // Principle-based tips
-    var tips = state.coach.principleTips(beforeChess, rec, state.records.length);
-    tips.forEach(function (t) {
-      addCoachMessage(t.type === 'good' ? 'good' : 'warn', t.type === 'good' ? 'Nice principle' : 'Coaching tip', t.text);
-    });
-  }
-
-  function suggestBetter() {
-    return 'Step back with ◀ and check the Analysis panel to compare with the engine\'s top lines.';
   }
 
   // ---- Coach panel ------------------------------------------------------
@@ -1706,26 +1796,24 @@
     wrap.scrollTop = wrap.scrollHeight;
   }
 
+  // Glyph shown after a move in the history for each quality label.
+  var MOVE_GLYPH = {
+    brilliant: '‼', great: '!', best: '★', excellent: '', good: '',
+    book: '📖', inaccuracy: '?!', mistake: '?', miss: '✗', blunder: '??',
+  };
   function moveCell(rec, plyNumber) {
     var td = document.createElement('td');
     td.className = 'mv';
     if (state.viewPly === plyNumber) td.classList.add('current');
     td.textContent = rec.san;
-    if (rec.quality && (rec.quality.type === 'inaccuracy' || rec.quality.type === 'mistake' || rec.quality.type === 'blunder')) {
-      var q = document.createElement('span');
-      q.className = 'q ' + rec.quality.type;
-      q.textContent = rec.quality.type === 'inaccuracy' ? '?!' : rec.quality.type === 'mistake' ? '?' : '??';
-      td.appendChild(q);
-    } else if (rec.quality && rec.quality.type === 'best') {
-      var qb = document.createElement('span');
-      qb.className = 'q best';
-      qb.textContent = '!';
-      td.appendChild(qb);
-    } else if (rec.quality && rec.quality.type === 'book') {
-      var qk = document.createElement('span');
-      qk.className = 'q book';
-      qk.textContent = '📖';
-      td.appendChild(qk);
+    if (rec.quality) {
+      var g = MOVE_GLYPH[rec.quality.type];
+      if (g) {
+        var q = document.createElement('span');
+        q.className = 'q q-' + rec.quality.type;
+        q.textContent = g;
+        td.appendChild(q);
+      }
     }
     td.addEventListener('click', function () {
       navTo(plyNumber);

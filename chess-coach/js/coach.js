@@ -208,61 +208,312 @@
 
   // Central squares (indices): d4=35, e4=36, d5=27, e5=28.
   var CENTER = [27, 28, 35, 36];
-  var EXTENDED_CENTER = [18, 19, 20, 21, 26, 29, 34, 37, 42, 43, 44, 45];
 
-  // Evaluate a human move against opening/positional principles.
-  // `beforeChess` is the position before the move; `record` is the move record.
-  // `moveNumber` is the full-move count. Returns an array of tip strings.
-  Coach.prototype.principleTips = function (beforeChess, record, plyCount) {
-    var tips = [];
-    var move = record.move;
-    var piece = typeOf(move.piece);
-    var color = record.color;
-    var toRank = rankOf(move.to);
-    var fromRank = rankOf(move.from);
-    var isOpening = plyCount <= 20;
+  var MATE = 100000;
+  var PIECE_NAME = {p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king'};
+  function sq(i) { return Chess.indexToSquare(i); }
+  function pieceName(ch) { return ch ? PIECE_NAME[typeOf(ch)] : 'piece'; }
+  function see(chess, move) { return global.ChessAI ? global.ChessAI.see(chess, move) : 0; }
+  function isMateScore(s) { return Math.abs(s) > MATE - 1000; }
+  function mateIn(s) { return Math.ceil((MATE - Math.abs(s)) / 2); }
 
-    // Castling is praised.
-    if (move.flags.indexOf('k') !== -1 || move.flags.indexOf('q') !== -1) {
-      tips.push({type: 'good', text: 'Castling early tucks your king into safety and connects your rooks. Well done.'});
-      return tips;
+  // Find a legal move object matching {from,to,promotion} in a position.
+  function findLegal(chess, mv) {
+    if (!mv) return null;
+    var legal = chess.generateLegalMoves();
+    for (var i = 0; i < legal.length; i++) {
+      if (legal[i].from === mv.from && legal[i].to === mv.to && (legal[i].promotion || null) === (mv.promotion || null)) return legal[i];
+    }
+    return null;
+  }
+
+  // Describe what a move accomplishes tactically ("wins the rook on a8",
+  // "delivers check", "forces mate in 3"). `pos` is the position BEFORE `mv`.
+  function describeGain(pos, mv, scoreForSide) {
+    if (isMateScore(scoreForSide) && scoreForSide > 0) {
+      var n = mateIn(scoreForSide);
+      return 'forces mate' + (n > 0 ? ' in ' + n : '');
+    }
+    var legal = findLegal(pos, mv);
+    if (legal && legal.captured) {
+      var gain = see(pos, legal);
+      if (gain >= 200) return 'wins the ' + pieceName(legal.captured) + ' on ' + sq(mv.to);
+      if (gain >= 90) return 'wins material on ' + sq(mv.to);
+    }
+    return null;
+  }
+
+  // ---- Move annotation --------------------------------------------------
+  // Classify + explain a move. ctx = {
+  //   beforeFen, afterFen, rec, analysisBefore, analysisAfter,
+  //   moverColor, plyCount }.
+  // analysisBefore/After use the app's wire shape:
+  //   {whiteScore, turn, bestMove:{from,to,promotion,san}, ranked:[{from,to,promotion,score,san}]}
+  // Returns {type, label, glyph, cp, headline, details:[...], better, evalWhite}.
+  Coach.prototype.annotate = function (ctx) {
+    var rec = ctx.rec;
+    var mover = ctx.moverColor;
+    var before = ctx.analysisBefore;
+    var after = ctx.analysisAfter;
+
+    // Locate the played move + best move within the pre-move analysis.
+    var played = null, playedRank = -1, bestScore = null, best = before && before.bestMove;
+    if (before && before.ranked) {
+      for (var i = 0; i < before.ranked.length; i++) {
+        var e = before.ranked[i];
+        if (i === 0) bestScore = e.score;
+        if (e.from === rec.move.from && e.to === rec.move.to && (e.promotion || null) === (rec.move.promotion || null)) {
+          played = e; playedRank = i;
+        }
+      }
+    }
+    var cpLoss = played && bestScore != null ? Math.max(0, bestScore - played.score) : 0;
+    var wasBest = playedRank === 0;
+
+    // Detect sacrifice (the move itself gives up material by the exchange).
+    var beforePos = new Chess(ctx.beforeFen);
+    var legalPlayed = findLegal(beforePos, rec.move);
+    var isSac = false;
+    if (legalPlayed) {
+      // A move is a "sacrifice" if it hangs material immediately (SEE < 0 for a
+      // capture, or a quiet move that leaves the moved piece takeable for less).
+      if (legalPlayed.captured) isSac = see(beforePos, legalPlayed) <= -120;
+      else if (after && after.bestMove) {
+        var afterPos = new Chess(ctx.afterFen);
+        var refute = findLegal(afterPos, after.bestMove);
+        if (refute && refute.captured && refute.to === rec.move.to) isSac = see(afterPos, refute) >= 200;
+      }
     }
 
-    if (isOpening) {
-      // Center pawn moves.
-      if (piece === 'p' && CENTER.indexOf(move.to) !== -1) {
-        tips.push({type: 'good', text: 'Occupying the center with a pawn grabs space and opens lines for your pieces.'});
-      }
+    // Was a decisive resource available and missed?
+    var bestIsMate = bestScore != null && isMateScore(bestScore) && bestScore > 0;
+    var playedIsMate = played && isMateScore(played.score) && played.score > 0;
+    var bestWinsBig = bestScore != null && !bestIsMate && bestScore >= 250;
+    var stillWinningBig = played && played.score >= 250;
 
-      // Developing a minor piece off the back rank.
-      var backRank = color === 'w' ? 7 : 0;
-      if ((piece === 'n' || piece === 'b') && fromRank === backRank) {
-        tips.push({type: 'good', text: 'Developing a ' + (piece === 'n' ? 'knight' : 'bishop') + ' toward the center is exactly what the opening calls for.'});
-      }
+    // ---- Label ----
+    var type, label, glyph;
+    if (ctx.inBook) {
+      type = 'book'; label = 'Book'; glyph = '📖';
+    } else if (bestIsMate && !playedIsMate) {
+      type = 'miss'; label = 'Missed mate'; glyph = '✗';
+    } else if (bestWinsBig && !stillWinningBig && cpLoss >= 200) {
+      type = 'miss'; label = 'Missed win'; glyph = '✗';
+    } else if (wasBest && isSac && (played && (played.score >= 60 || isMateScore(played.score)))) {
+      type = 'brilliant'; label = 'Brilliant'; glyph = '‼';
+    } else if (wasBest && before && before.ranked && before.ranked.length > 1 &&
+               (before.ranked[1].score - (before.ranked[0].score)) <= -180 &&
+               before.ranked[0].score > -250) {
+      // Only move: the second-best is far worse.
+      type = 'great'; label = 'Great move'; glyph = '!';
+    } else if (wasBest || cpLoss <= 10) {
+      type = 'best'; label = 'Best'; glyph = '★';
+    } else if (cpLoss <= 35) {
+      type = 'excellent'; label = 'Excellent'; glyph = '';
+    } else if (cpLoss <= 75) {
+      type = 'good'; label = 'Good'; glyph = '';
+    } else if (cpLoss <= 130) {
+      type = 'inaccuracy'; label = 'Inaccuracy'; glyph = '?!';
+    } else if (cpLoss <= 280) {
+      type = 'mistake'; label = 'Mistake'; glyph = '?';
+    } else {
+      type = 'blunder'; label = 'Blunder'; glyph = '??';
+    }
 
-      // Early queen sortie.
-      if (piece === 'q' && plyCount <= 6) {
-        tips.push({type: 'warn', text: 'Bringing the queen out this early can expose it — opponents develop with tempo by attacking it. Develop knights and bishops first.'});
-      }
+    var result = {type: type, label: label, glyph: glyph, cp: cpLoss,
+      evalWhite: after ? after.whiteScore : (ctx.over ? null : (before ? before.whiteScore : 0)),
+      headline: '', details: [], better: null};
 
-      // Moving the same piece twice in the opening (rook-pawn/edge moves).
-      if (piece === 'p' && (fileOf(move.to) === 0 || fileOf(move.to) === 7) && plyCount <= 8) {
-        tips.push({type: 'warn', text: 'Edge-pawn moves rarely help development in the opening. Prioritize center pawns and minor pieces.'});
-      }
+    // ---- Explanation ----
+    var betterSan = best ? best.san : null;
 
-      // Knight to the rim.
-      if (piece === 'n' && (fileOf(move.to) === 0 || fileOf(move.to) === 7)) {
-        tips.push({type: 'warn', text: '"A knight on the rim is dim." Knights are far stronger near the center where they control more squares.'});
+    // What did a bad move allow? Look at the opponent's best reply (afterPos).
+    var allowed = null;
+    if (after && after.bestMove && (type === 'blunder' || type === 'mistake' || type === 'miss' || type === 'inaccuracy')) {
+      var ap = new Chess(ctx.afterFen);
+      var oppScoreForOpp = after.ranked && after.ranked.length ? after.ranked[0].score : null;
+      if (oppScoreForOpp != null && isMateScore(oppScoreForOpp) && oppScoreForOpp > 0) {
+        allowed = 'allows ' + after.bestMove.san + ', forcing mate';
+      } else {
+        var oppMove = findLegal(ap, after.bestMove);
+        if (oppMove && oppMove.captured && see(ap, oppMove) >= 150) {
+          allowed = 'lets ' + after.bestMove.san + ' win the ' + pieceName(oppMove.captured) + ' on ' + sq(oppMove.to);
+        }
       }
     }
 
-    return tips;
+    if (type === 'brilliant') {
+      result.headline = 'Brilliant! A daring sacrifice that works.';
+    } else if (type === 'great') {
+      result.headline = 'Great move — the only move that keeps your position.';
+    } else if (type === 'best') {
+      result.headline = 'Best move — the engine\'s top choice.';
+    } else if (type === 'excellent') {
+      result.headline = 'Excellent — very close to the best move.';
+    } else if (type === 'good') {
+      result.headline = 'A good, sound move.';
+    } else if (type === 'miss') {
+      if (bestIsMate) result.headline = 'You missed a forced mate.';
+      else result.headline = 'You missed a chance to win material.';
+      if (betterSan) {
+        var gainDesc = describeGain(beforePos, best, bestScore);
+        result.details.push(betterSan + (gainDesc ? ' ' + gainDesc + '.' : ' was much stronger.'));
+      }
+    } else if (type === 'inaccuracy' || type === 'mistake' || type === 'blunder') {
+      var sev = type === 'blunder' ? 'A blunder' : type === 'mistake' ? 'A mistake' : 'A slight inaccuracy';
+      result.headline = sev + ' — it costs about ' + (cpLoss / 100).toFixed(1) + ' pawns.';
+      if (allowed) result.details.push('It ' + allowed + '.');
+      if (betterSan) {
+        var gd = describeGain(beforePos, best, bestScore);
+        result.details.push('Stronger was ' + betterSan + (gd ? ', which ' + gd + '.' : '.'));
+      }
+    }
+    result.better = betterSan;
+
+    // ---- Positional / phase notes (only when the move wasn't a blunder) ----
+    if (type !== 'blunder' && type !== 'mistake' && type !== 'miss') {
+      var note = this.positionalNote(ctx);
+      if (note) result.details.push(note);
+    }
+
+    return result;
   };
 
-  // Classify a move by its centipawn loss: how much worse the played move's
-  // evaluation is than the best available move, both scored from the mover's
-  // perspective at the same depth (so there is no side-to-move parity bias).
-  // `cpLoss` is >= 0; `wasBest` is true when the top engine move was played.
+  // A single concise positional observation about the move (phase-aware).
+  Coach.prototype.positionalNote = function (ctx) {
+    var rec = ctx.rec;
+    var move = rec.move;
+    var piece = typeOf(move.piece);
+    var color = ctx.moverColor;
+    var plies = ctx.plyCount;
+    var beforePos = new Chess(ctx.beforeFen);
+    var afterPos = new Chess(ctx.afterFen);
+
+    // Castling.
+    if (move.flags.indexOf('k') !== -1 || move.flags.indexOf('q') !== -1) {
+      return 'Castling tucks your king to safety and connects your rooks — a key opening goal.';
+    }
+
+    var phase = gamePhase(afterPos);
+
+    if (phase === 'opening') {
+      var backRank = color === 'w' ? 7 : 0;
+      if (piece === 'p' && CENTER.indexOf(move.to) !== -1) return 'Grabbing the center stakes out space and frees your pieces.';
+      if ((piece === 'n' || piece === 'b') && rankOf(move.from) === backRank) return 'Good development — bringing a ' + PIECE_NAME[piece] + ' into play toward the center.';
+      if (piece === 'q' && plies <= 6) return 'Careful developing the queen so early — it can be chased around, losing you time.';
+      if (piece === 'n' && (fileOf(move.to) === 0 || fileOf(move.to) === 7)) return 'A knight on the rim is dim — it controls fewer squares at the edge.';
+      if (!isDeveloped(beforePos, color) && piece === 'p' && plies > 6) return 'You still have pieces at home — prioritize developing knights and bishops and castling.';
+    }
+
+    // Rook to an open/semi-open file (any phase).
+    if (piece === 'r') {
+      var f = fileOf(move.to);
+      if (fileOpenness(afterPos, f) === 'open') return 'Placing a rook on the open ' + fileLetter(f) + '-file is strong — open files are highways for rooks.';
+      if (fileOpenness(afterPos, f) === 'semi-' + color) return 'A rook on the half-open ' + fileLetter(f) + '-file pressures the enemy pawns.';
+    }
+
+    // Passed pawn push in the endgame.
+    if (phase === 'endgame') {
+      if (piece === 'p') return 'In the endgame, passed pawns are gold — push them and support them with your king.';
+      if (piece === 'k') return 'Activate your king in the endgame — it becomes a fighting piece.';
+    }
+
+    return null;
+  };
+
+  // Detect an immediate threat the opponent has (used on the human's turn).
+  // `nullAnalysis` is the analysis of the position after the human "passes".
+  // Returns a warning string, or null.
+  Coach.prototype.detectThreat = function (nullFen, nullAnalysis, currentWhite, humanColor) {
+    if (!nullAnalysis || !nullAnalysis.bestMove) return null;
+    var beforeHuman = humanColor === 'w' ? currentWhite : -currentWhite;
+    var afterHuman = humanColor === 'w' ? nullAnalysis.whiteScore : -nullAnalysis.whiteScore;
+    var drop = beforeHuman - afterHuman; // how much the human loses by doing nothing
+    if (drop < 150) return null;
+
+    var pos = new Chess(nullFen);
+    var oppScore = nullAnalysis.ranked && nullAnalysis.ranked.length ? nullAnalysis.ranked[0].score : null;
+    if (oppScore != null && isMateScore(oppScore) && oppScore > 0) {
+      return 'Watch out — your opponent threatens ' + nullAnalysis.bestMove.san + ', with a mating attack. Deal with it.';
+    }
+    var m = findLegal(pos, nullAnalysis.bestMove);
+    if (m && m.captured && see(pos, m) >= 150) {
+      return 'Careful — your opponent threatens ' + nullAnalysis.bestMove.san + ', winning the ' + pieceName(m.captured) + ' on ' + sq(m.to) + '. Defend it, move it, or create a bigger threat.';
+    }
+    return 'Careful — your opponent has a strong threat (' + nullAnalysis.bestMove.san + '). Look for what it attacks before you move.';
+  };
+
+  // ---- End-of-game review ------------------------------------------------
+  // records: array of {san, color, quality:{type,cp}, evalWhite}
+  Coach.prototype.gameReview = function (records, humanColor) {
+    function acc(list) {
+      if (!list.length) return 100;
+      var sum = 0;
+      for (var i = 0; i < list.length; i++) sum += list[i];
+      var acpl = sum / list.length;
+      var a = 103.1668 * Math.exp(-0.04354 * acpl) - 3.1669;
+      return Math.max(0, Math.min(100, Math.round(a)));
+    }
+    var sides = {w: {losses: [], counts: {}}, b: {losses: [], counts: {}}};
+    var worst = null, best = null;
+    for (var i = 0; i < records.length; i++) {
+      var r = records[i];
+      if (!r.quality) continue;
+      var s = sides[r.color];
+      var cp = r.quality.type === 'book' ? 0 : (r.quality.cp || 0);
+      s.losses.push(cp);
+      s.counts[r.quality.type] = (s.counts[r.quality.type] || 0) + 1;
+      if (r.color === humanColor) {
+        if (!worst || cp > worst.cp) worst = {cp: cp, ply: i, san: r.san, better: r.quality.better, type: r.quality.type};
+        if (r.quality.type === 'brilliant' || r.quality.type === 'great') best = {ply: i, san: r.san, type: r.quality.type};
+      }
+    }
+    var oppColor = humanColor === 'w' ? 'b' : 'w';
+    return {
+      humanAccuracy: acc(sides[humanColor].losses),
+      oppAccuracy: acc(sides[oppColor].losses),
+      counts: sides[humanColor].counts,
+      worst: worst && worst.cp >= 90 ? worst : null,
+      best: best,
+      moves: sides[humanColor].losses.length,
+    };
+  };
+
+  // ---- Helpers ----------------------------------------------------------
+  function gamePhase(chess) {
+    var b = chess.board, majors = 0, queens = 0, plies = chess.history ? chess.history.length : 0;
+    for (var i = 0; i < 64; i++) {
+      var p = b[i];
+      if (!p) continue;
+      var t = typeOf(p);
+      if (t === 'q') queens++;
+      else if (t === 'r' || t === 'b' || t === 'n') majors++;
+    }
+    if (queens === 0 || (queens <= 2 && majors <= 3)) return 'endgame';
+    if (plies <= 16) return 'opening';
+    return 'middlegame';
+  }
+  function isDeveloped(chess, color) {
+    // True once at least three minor pieces have left their home squares.
+    var home = color === 'w' ? {N: [57, 62], B: [58, 61]} : {n: [1, 6], b: [2, 5]};
+    var b = chess.board, athome = 0;
+    Object.keys(home).forEach(function (pc) {
+      home[pc].forEach(function (idx) { if (b[idx] === pc) athome++; });
+    });
+    return athome <= 1;
+  }
+  function fileLetter(f) { return String.fromCharCode(97 + f); }
+  function fileOpenness(chess, f) {
+    var b = chess.board, wp = 0, bp = 0;
+    for (var r = 0; r < 8; r++) { var p = b[r * 8 + f]; if (p === 'P') wp++; else if (p === 'p') bp++; }
+    if (wp === 0 && bp === 0) return 'open';
+    if (wp === 0) return 'semi-w';
+    if (bp === 0) return 'semi-b';
+    return 'closed';
+  }
+
+  // Classify a move by its centipawn loss (kept for compatibility; the richer
+  // annotate() above is preferred).
   Coach.prototype.classifyLoss = function (cpLoss, wasBest) {
     if (cpLoss < 0) cpLoss = 0;
     if (wasBest || cpLoss <= 15) return {label: 'Best', type: 'best', cp: cpLoss};
