@@ -564,16 +564,14 @@
   // localStorage keeps the profile between sessions, but it's tied to this
   // browser + file location. Export/Import lets the player keep a real backup
   // file they control — portable across browsers, machines, and file moves.
-  function exportProfile() {
+  // Normal blob download — works on a local file:// page and on the open web.
+  function anchorDownload(filename, data) {
     try {
-      var data = JSON.stringify(normalizeProfile(profile), null, 2);
       var blob = new Blob([data], {type: 'application/json'});
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
-      var stamp = new Date().toISOString().slice(0, 10);
-      var who = (profile.nickname || profile.name || 'player').replace(/[^\w-]+/g, '_');
       a.href = url;
-      a.download = 'chess-coach-profile-' + who + '-' + stamp + '.json';
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -581,6 +579,27 @@
     } catch (e) {
       alert('Could not export the profile: ' + e.message);
     }
+  }
+
+  function exportProfile() {
+    var data = JSON.stringify(normalizeProfile(profile), null, 2);
+    var stamp = new Date().toISOString().slice(0, 10);
+    var who = (profile.nickname || profile.name || 'player').replace(/[^\w-]+/g, '_');
+    var filename = 'chess-coach-profile-' + who + '-' + stamp + '.json';
+    // Inside the hosted claude.ai artifact viewer, a plain download link is
+    // inert — saving is mediated by the runtime. Use it when present; on a
+    // local file:// page window.claude doesn't exist, so fall back to a blob.
+    if (window.claude && typeof window.claude.use === 'function') {
+      window.claude.use('downloads').then(function (dl) {
+        if (dl && dl.save) {
+          dl.save({filename: filename, data: data}).catch(function () { /* declined */ });
+        } else {
+          anchorDownload(filename, data);
+        }
+      }).catch(function () { anchorDownload(filename, data); });
+      return;
+    }
+    anchorDownload(filename, data);
   }
 
   function importProfile(file) {
