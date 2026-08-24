@@ -13,14 +13,19 @@ panel is visible at once.
 
 ```
 chess-coach/
-├── index.html      # App shell & layout
-├── css/styles.css  # Theme & responsive layout
+├── index.html            # App shell & layout
+├── glossary.html         # A–Z chess glossary (searchable)
+├── opening-systems.html  # Opening systems guide (Basic/Moderate/Advanced)
+├── css/styles.css        # Theme & responsive layout
 └── js/
-    ├── engine.js   # Chess rules engine (move gen, legality, SAN, FEN)
-    ├── ai.js       # Evaluation + iterative-deepening alpha-beta search
-    ├── coach.js    # Opening book + principle-based coaching
-    └── app.js      # UI controller wiring it all together
+    ├── engine.js         # Chess rules engine (move gen, legality, SAN, FEN)
+    ├── ai.js             # Evaluation + iterative-deepening alpha-beta search
+    ├── coach.js          # Opening book + principle-based coaching
+    └── app.js            # UI controller wiring it all together
 ```
+
+A header nav bar links the three pages: **Play**, **Glossary**, and **Opening
+Systems**.
 
 ## Features
 
@@ -79,6 +84,15 @@ Six levels, each with its own search depth, thinking-time budget, and
   position, or step through with the arrow keys / navigation buttons.
 - **Live analysis**: evaluation bar and the engine's top candidate lines.
 - **Undo** and **Copy PGN**.
+
+### Reference pages
+- **Chess Glossary** (`glossary.html`) — an A–Z of ~110 terms covering the
+  rules, tactics, pawn structures, positional ideas, and endgame concepts you
+  meet in the coach's feedback, with a live search filter and a jump bar.
+- **Opening Systems** (`opening-systems.html`) — the openings the coach and AI
+  personalities play, grouped into **Basic**, **Moderate**, and **Advanced**
+  tiers. Each entry lists its ECO code and main moves and explains the idea,
+  the middlegame strategy for both colors, and practical hints.
 
 ## Under the hood
 
