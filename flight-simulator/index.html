@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <title>SkyTrainer — Flight Simulator for Student Pilots</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <header id="topbar">
+      <div class="brand">✈ <span>SkyTrainer</span> <em>Cessna 172 · Student Pilot Trainer</em></div>
+      <div class="controls">
+        <label for="scenario">Lesson</label>
+        <select id="scenario"></select>
+        <button id="pause">⏸ Pause</button>
+        <button id="reset">↻ Reset</button>
+        <button id="sound">🔈 Sound Off</button>
+        <button id="help-btn" title="Show controls">? Controls</button>
+      </div>
+    </header>
+
+    <main id="stage">
+      <!-- Out-the-window view -->
+      <canvas id="world"></canvas>
+
+      <!-- Heads-up readout -->
+      <div id="hud"></div>
+
+      <!-- Instructor / objective panel -->
+      <aside id="instructor">
+        <div id="objective-title" class="obj-title">Lesson</div>
+        <div id="objective-text" class="obj-text"></div>
+        <div id="instructor-tip" class="tip"></div>
+        <div id="status" class="status"></div>
+      </aside>
+
+      <!-- Stall/annunciator strip lives inside HUD; nothing here -->
+    </main>
+
+    <!-- Instrument panel -->
+    <section id="panel-wrap">
+      <canvas id="panel"></canvas>
+    </section>
+
+    <!-- Controls help overlay -->
+    <div id="help" class="hidden">
+      <div class="help-card">
+        <h2>Cockpit Controls</h2>
+        <div class="help-grid">
+          <div>
+            <h3>Primary flight controls</h3>
+            <ul>
+              <li><kbd>↑</kbd>/<kbd>W</kbd> &amp; <kbd>↓</kbd>/<kbd>S</kbd> — Elevator (pitch down / up)</li>
+              <li><kbd>←</kbd>/<kbd>A</kbd> &amp; <kbd>→</kbd>/<kbd>D</kbd> — Ailerons (roll left / right)</li>
+              <li><kbd>Q</kbd> &amp; <kbd>E</kbd> — Rudder (yaw left / right)</li>
+              <li><kbd>M</kbd> — Toggle mouse-as-yoke</li>
+            </ul>
+            <h3>Engine &amp; configuration</h3>
+            <ul>
+              <li><kbd>Shift</kbd> / <kbd>Ctrl</kbd> — Throttle up / down</li>
+              <li><kbd>Z</kbd> — Full power · <kbd>X</kbd> — Idle</li>
+              <li><kbd>F</kbd> / <kbd>G</kbd> — Flaps down / up (0–30°)</li>
+              <li><kbd>[</kbd> / <kbd>]</kbd> — Elevator trim nose up / down</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Ground &amp; sim</h3>
+            <ul>
+              <li><kbd>B</kbd> (hold) / click — Wheel brakes</li>
+              <li><kbd>P</kbd> — Parking brake</li>
+              <li><kbd>Space</kbd> — Pause · <kbd>R</kbd> — Reset lesson</li>
+            </ul>
+            <h3>The instrument scan (six-pack)</h3>
+            <ul>
+              <li><b>ASI</b> airspeed · <b>AI</b> attitude · <b>ALT</b> altitude</li>
+              <li><b>TC</b> turn coordinator + slip/skid ball</li>
+              <li><b>HI</b> heading · <b>VSI</b> vertical speed</li>
+              <li>Keep the ball centred — <em>"step on the ball"</em>.</li>
+            </ul>
+            <p class="note">
+              A gamepad is supported automatically if connected. Enable
+              <b>Sound</b> for the engine drone and stall-warning horn.
+            </p>
+          </div>
+        </div>
+        <button id="help-close">Got it — start flying</button>
+      </div>
+    </div>
+
+    <script src="js/physics.js"></script>
+    <script src="js/input.js"></script>
+    <script src="js/render.js"></script>
+    <script src="js/instruments.js"></script>
+    <script src="js/main.js"></script>
+    <script>
+      // Help overlay wiring (kept out of main.js — pure UI chrome).
+      (function () {
+        var help = document.getElementById('help');
+        document.getElementById('help-btn').addEventListener('click', function () {
+          help.classList.remove('hidden');
+        });
+        document.getElementById('help-close').addEventListener('click', function () {
+          help.classList.add('hidden');
+        });
+        // Show once on first load.
+        if (!localStorage.getItem('skytrainer_seen')) {
+          help.classList.remove('hidden');
+          try { localStorage.setItem('skytrainer_seen', '1'); } catch (e) {}
+        }
+      })();
+    </script>
+  </body>
+</html>
