@@ -1195,11 +1195,13 @@
         span.className = 'piece';
         span.textContent = GLYPH[Chess.typeOf(piece)];
         if (Chess.colorOf(piece) === 'w') {
-          span.style.color = '#fff';
-          span.style.textShadow = '0 0 1px #000, 0 1px 2px rgba(0,0,0,.5)';
+          span.style.color = '#fafafa';
+          // Dark outline so white pieces stand out on the light squares.
+          span.style.textShadow = '-1px -1px 0 #333, 1px -1px 0 #333, -1px 1px 0 #333, 1px 1px 0 #333, 0 0 2px rgba(0,0,0,.4)';
         } else {
-          span.style.color = '#1a1a1a';
-          span.style.textShadow = '0 1px 1px rgba(255,255,255,.15)';
+          span.style.color = '#141414';
+          // White outline so black pieces stand out on the blue squares.
+          span.style.textShadow = '-1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 0 0 2px rgba(255,255,255,.9)';
         }
         cell.appendChild(span);
       }
@@ -1974,8 +1976,10 @@
     ['q', 'r', 'b', 'n'].forEach(function (t) {
       var btn = document.createElement('button');
       btn.textContent = GLYPH[t];
-      btn.style.color = color === 'w' ? '#fff' : '#1a1a1a';
-      btn.style.textShadow = color === 'w' ? '0 0 2px #000' : 'none';
+      btn.style.color = color === 'w' ? '#fafafa' : '#141414';
+      btn.style.textShadow = color === 'w'
+        ? '-1px -1px 0 #333, 1px -1px 0 #333, -1px 1px 0 #333, 1px 1px 0 #333'
+        : '-1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff';
       btn.addEventListener('click', function () {
         modal.classList.remove('show');
         callback(t);
