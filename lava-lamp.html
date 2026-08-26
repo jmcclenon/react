@@ -499,7 +499,7 @@
       y: y,
       vx: 0, vy: 0,
       r: 0.20 + Math.random() * 0.16,   // normalized radius (unit = maxHalf)
-      temp: 0.3 + Math.random() * 0.4,
+      temp: 0.55 + Math.random() * 0.4,  // start warm so wax is already on the move
       wob: Math.random() * Math.PI * 2,  // wobble phase for organic horizontal drift
     };
   }
@@ -510,18 +510,20 @@
     for (let i = 0; i < n; i++) blobs.push(makeBlob(i));
     // one fat, slow "mother" blob that mostly lives near the base
     blobs[0].r = 0.34;
-    blobs[0].y = 0.08;
-    blobs[0].temp = 0.9;
+    blobs[0].y = 0.10;
+    blobs[0].temp = 1.0;
   }
   seedBlobs(9);
 
   // physics constants
-  const AMBIENT = 0.5;
-  const HEAT_RATE = 0.9;    // per second near base
-  const COOL_RATE = 0.7;    // per second near cap
-  const DRIFT_COOL = 0.06;  // ambient cooling everywhere
-  const BUOY = 0.9;         // buoyancy strength
-  const DAMP = 0.86;        // velocity damping per step
+  const AMBIENT = 0.5;      // neutral-buoyancy temperature
+  const HEAT_ZONE = 0.22;   // lower fraction of the vessel that is heated
+  const COOL_ZONE = 0.80;   // above this fraction the wax sheds heat
+  const HEAT_RATE = 1.8;    // per second near the base
+  const COOL_RATE = 1.3;    // per second near the cap
+  const DRIFT_COOL = 0.13;  // ambient cooling everywhere (drives the mid-lamp turnaround)
+  const BUOY = 2.6;         // buoyancy strength
+  const DAMP_K = 4.5;       // continuous velocity damping rate (1/s)
 
   let speed = 1.0;          // user flow multiplier
 
@@ -529,39 +531,43 @@
     dt = Math.min(dt, 0.05) * speed;
     if (dt <= 0) return;
 
+    const damp = Math.exp(-DAMP_K * dt);
+
     for (const b of blobs) {
       const hw = profileHalf(b.y);
 
-      // heat exchange
-      if (b.y < 0.14) {
-        b.temp += HEAT_RATE * dt * (1.0 - b.temp);       // warm at the base
-      } else if (b.y > 0.84) {
-        b.temp -= COOL_RATE * dt * b.temp;               // cool at the cap
+      // heat exchange with the lamp: warm low, cool high
+      if (b.y < HEAT_ZONE) {
+        const near = 1.0 - b.y / HEAT_ZONE;              // strongest at the very base
+        b.temp += HEAT_RATE * near * dt * (1.0 - b.temp);
+      } else if (b.y > COOL_ZONE) {
+        const near = (b.y - COOL_ZONE) / (1.0 - COOL_ZONE);
+        b.temp -= COOL_RATE * near * dt * b.temp;
       }
-      b.temp -= DRIFT_COOL * dt;                          // gentle ambient loss
+      b.temp -= DRIFT_COOL * dt;                          // gentle ambient loss in transit
       b.temp = clamp(b.temp, 0.0, 1.0);
 
-      // buoyancy from temperature difference; bigger blobs are more sluggish
-      const buoy = (b.temp - AMBIENT) * BUOY / (0.55 + b.r);
+      // buoyancy from temperature difference; bigger blobs are a little more sluggish
+      const buoy = (b.temp - AMBIENT) * BUOY / (0.6 + b.r);
       b.vy += buoy * dt;
 
-      // organic horizontal wander + gentle pull to center
-      b.wob += dt * (0.5 + b.r);
-      b.vx += (Math.sin(b.wob) * 0.05 - b.x * 0.35) * dt;
+      // organic horizontal wander + a soft pull back toward center
+      b.wob += dt * (0.6 + b.r);
+      b.vx += (Math.sin(b.wob) * 0.09 - b.x * 0.22) * dt;
 
-      // damping
-      const d = Math.pow(DAMP, dt * 60);
-      b.vx *= d;
-      b.vy *= d;
+      // damping (frame-rate independent)
+      b.vx *= damp;
+      b.vy *= damp;
 
       // integrate
       b.x += b.vx * dt;
       b.y += b.vy * dt;
 
-      // vertical bounds — reheats at bottom, cools + pools at top
-      const rB = b.r * 0.9;
-      if (b.y < rB * 0.5) { b.y = rB * 0.5; b.vy = Math.abs(b.vy) * 0.2; }
-      if (b.y > 1.0 - rB * 0.5) { b.y = 1.0 - rB * 0.5; b.vy = -Math.abs(b.vy) * 0.2; }
+      // vertical bounds — pool + reheat at the base, pool + cool at the cap
+      const loY = b.r * 0.42;
+      const hiY = 1.0 - b.r * 0.42;
+      if (b.y < loY) { b.y = loY; b.vy = Math.abs(b.vy) * 0.15; }
+      if (b.y > hiY) { b.y = hiY; b.vy = -Math.abs(b.vy) * 0.15; }
 
       // horizontal bounds — keep the blob body within the glass wall
       const limit = Math.max(0.0, hw - b.r * 0.45);
