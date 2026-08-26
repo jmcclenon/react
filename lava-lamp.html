@@ -466,21 +466,21 @@
       liquid += sheen * 0.06;
 
       // ---- wax surface ----
-      // low threshold + wide feather => big blobs that reach toward each other and
-      // merge with stretchy necks instead of staying as separate circles.
-      float surf = smoothstep(0.55, 1.05, field);          // coverage
-      float core = smoothstep(1.0, 3.0, field);            // dense interior
-      vec3 wax = waxCol * (0.72 + 0.5 * core);             // denser interior reads brighter
-      // inner luminosity: hotter, denser wax glows a touch
-      wax += waxCol * core * 0.3 * temp;
-      // rim light on the wax edge where it meets liquid
-      float edge = smoothstep(0.55, 0.85, field) * (1.0 - smoothstep(0.85, 1.4, field));
-      wax += vec3(1.0) * edge * 0.09;
+      // higher threshold + tight feather => distinct rounded blobs that only fuse
+      // when they actually touch, with clear liquid between them.
+      float surf = smoothstep(0.95, 1.18, field);          // sharp-ish blob edge
+      float dens = smoothstep(1.0, 2.4, field);            // 0 at rim .. 1 deep inside
+
+      // opaque, backlit wax — solid color with soft internal volume shading,
+      // NOT an emissive glow. Rim reads darker, center a touch fuller.
+      vec3 wax = waxCol * (0.5 + 0.42 * dens);
+      // a small soft sheen only in the densest part, so it looks lit-through, not neon
+      wax += waxCol * 0.12 * smoothstep(1.9, 3.2, field);
 
       vec3 col = mix(liquid, wax, surf);
 
       // subtle global vignette inside vessel
-      col *= mix(0.9, 1.06, rim);
+      col *= mix(0.9, 1.04, rim);
 
       gl_FragColor = vec4(col, inside);
     }
@@ -549,7 +549,7 @@
       x: (Math.random() * 2 - 1) * 0.35,
       y: Math.random(),
       vx: 0, vy: 0,
-      r: 0.26 + Math.random() * 0.26,    // normalized radius (unit = maxHalf) — big, varied
+      r: 0.18 + Math.random() * 0.16,    // normalized radius (unit = maxHalf) — distinct blobs
       temp: 0.55 + Math.random() * 0.4,  // start warm so wax is already on the move
       wob: Math.random() * Math.PI * 2,  // wobble phase for organic horizontal drift
       col: [1, 1, 1],                    // assigned from the active formula's palette
@@ -561,11 +561,11 @@
     blobs.length = 0;
     for (let i = 0; i < n; i++) blobs.push(makeBlob(i));
     // one fat, slow "mother" blob that mostly lives near the base
-    blobs[0].r = 0.55;
+    blobs[0].r = 0.40;
     blobs[0].y = 0.14;
     blobs[0].temp = 1.0;
   }
-  seedBlobs(12);
+  seedBlobs(8);
 
   // physics constants
   const AMBIENT = 0.5;      // neutral-buoyancy temperature
