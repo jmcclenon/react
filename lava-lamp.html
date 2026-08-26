@@ -517,13 +517,13 @@
 
   // physics constants
   const AMBIENT = 0.5;      // neutral-buoyancy temperature
-  const HEAT_ZONE = 0.22;   // lower fraction of the vessel that is heated
-  const COOL_ZONE = 0.80;   // above this fraction the wax sheds heat
-  const HEAT_RATE = 1.8;    // per second near the base
-  const COOL_RATE = 1.3;    // per second near the cap
-  const DRIFT_COOL = 0.13;  // ambient cooling everywhere (drives the mid-lamp turnaround)
+  const HEAT_ZONE = 0.24;   // lower fraction of the vessel that is heated
+  const COOL_ZONE = 0.74;   // above this fraction the wax sheds heat
+  const HEAT_RATE = 2.0;    // per second near the base
+  const COOL_RATE = 2.0;    // per second near the cap
+  const DRIFT_COOL = 0.02;  // tiny ambient loss in transit — wax stays hot on the way up
   const BUOY = 2.6;         // buoyancy strength
-  const DAMP_K = 4.5;       // continuous velocity damping rate (1/s)
+  const DAMP_K = 4.0;       // continuous velocity damping rate (1/s)
 
   let speed = 1.0;          // user flow multiplier
 
@@ -536,15 +536,16 @@
     for (const b of blobs) {
       const hw = profileHalf(b.y);
 
-      // heat exchange with the lamp: warm low, cool high
+      // heat exchange with the lamp: warm low, cool high, hold heat in between so a
+      // blob reaches the cap still buoyant, then sinks once cooled — a closed cycle.
       if (b.y < HEAT_ZONE) {
         const near = 1.0 - b.y / HEAT_ZONE;              // strongest at the very base
-        b.temp += HEAT_RATE * near * dt * (1.0 - b.temp);
+        b.temp += HEAT_RATE * near * dt * (1.05 - b.temp);
       } else if (b.y > COOL_ZONE) {
         const near = (b.y - COOL_ZONE) / (1.0 - COOL_ZONE);
-        b.temp -= COOL_RATE * near * dt * b.temp;
+        b.temp -= COOL_RATE * near * dt * (b.temp + 0.05);
       }
-      b.temp -= DRIFT_COOL * dt;                          // gentle ambient loss in transit
+      b.temp -= DRIFT_COOL * dt;                          // faint ambient loss in transit
       b.temp = clamp(b.temp, 0.0, 1.0);
 
       // buoyancy from temperature difference; bigger blobs are a little more sluggish
