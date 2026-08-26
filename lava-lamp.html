@@ -296,43 +296,90 @@
   const FORMULAS = [
     {
       name: "Aurora",
-      swatch: "linear-gradient(135deg,#ff3d7f,#7b2ff7)",
+      swatch: "conic-gradient(from 210deg,#ff3d7f,#b62ff7,#4f7bff,#2fd6e0,#ff3d7f)",
       glow: "#ffb347",
       bgInner: "#150a30", bgOuter: "#060411",
-      hot: [1.0, 0.24, 0.5], cool: [0.48, 0.18, 0.95],
-      liqTop: [0.09, 0.05, 0.22], liqBot: [0.05, 0.03, 0.13]
+      liqTop: [0.09, 0.05, 0.22], liqBot: [0.05, 0.03, 0.13],
+      colors: [
+        [1.0, 0.24, 0.55],  // hot pink
+        [0.92, 0.20, 0.85], // magenta
+        [0.58, 0.22, 0.98], // violet
+        [0.32, 0.42, 1.0],  // indigo blue
+        [0.24, 0.80, 1.0],  // cyan
+        [1.0, 0.45, 0.72]   // rose
+      ]
     },
     {
       name: "Magma",
-      swatch: "linear-gradient(135deg,#ffcf3a,#ff2d1a)",
+      swatch: "conic-gradient(from 210deg,#ffe23a,#ff9a1a,#ff2d1a,#c11208,#ffe23a)",
       glow: "#ff7a1a",
       bgInner: "#20080a", bgOuter: "#0a0302",
-      hot: [1.0, 0.82, 0.2], cool: [0.86, 0.12, 0.06],
-      liqTop: [0.16, 0.05, 0.03], liqBot: [0.09, 0.02, 0.02]
+      liqTop: [0.16, 0.05, 0.03], liqBot: [0.09, 0.02, 0.02],
+      colors: [
+        [1.0, 0.88, 0.24],  // gold
+        [1.0, 0.60, 0.12],  // orange
+        [1.0, 0.34, 0.08],  // ember
+        [0.90, 0.14, 0.06], // red
+        [1.0, 0.74, 0.18]   // amber
+      ]
     },
     {
       name: "Lagoon",
-      swatch: "linear-gradient(135deg,#3df0d0,#2f7bf7)",
+      swatch: "conic-gradient(from 210deg,#3df0d0,#2fd0ff,#2f7bf7,#3df0a0,#3df0d0)",
       glow: "#39d8ff",
       bgInner: "#04202a", bgOuter: "#02090f",
-      hot: [0.24, 0.95, 0.82], cool: [0.16, 0.45, 0.95],
-      liqTop: [0.03, 0.12, 0.16], liqBot: [0.02, 0.06, 0.1]
+      liqTop: [0.03, 0.12, 0.16], liqBot: [0.02, 0.06, 0.1],
+      colors: [
+        [0.24, 0.96, 0.84], // aqua
+        [0.16, 0.62, 0.98], // ocean blue
+        [0.22, 0.88, 0.60], // sea green
+        [0.36, 0.52, 1.0],  // cobalt
+        [0.55, 0.96, 0.92]  // pale cyan
+      ]
     },
     {
       name: "Toxic",
-      swatch: "linear-gradient(135deg,#c6ff3a,#20c05a)",
+      swatch: "conic-gradient(from 210deg,#c6ff3a,#8fe020,#20c05a,#3df0a0,#c6ff3a)",
       glow: "#9dff2a",
       bgInner: "#0d2007", bgOuter: "#030a02",
-      hot: [0.78, 1.0, 0.22], cool: [0.13, 0.72, 0.36],
-      liqTop: [0.06, 0.14, 0.05], liqBot: [0.03, 0.08, 0.03]
+      liqTop: [0.06, 0.14, 0.05], liqBot: [0.03, 0.08, 0.03],
+      colors: [
+        [0.80, 1.0, 0.24],  // acid lime
+        [0.42, 0.88, 0.20], // grass
+        [0.20, 0.78, 0.42], // emerald
+        [0.62, 0.96, 0.32], // chartreuse
+        [0.30, 0.92, 0.62]  // spring green
+      ]
     },
     {
       name: "Sunset",
-      swatch: "linear-gradient(135deg,#ff9a3d,#ff2f8e)",
+      swatch: "conic-gradient(from 210deg,#ff9a3d,#ff5a2f,#ff2f8e,#ffcf3a,#ff9a3d)",
       glow: "#ff9a3d",
       bgInner: "#22091b", bgOuter: "#0a0206",
-      hot: [1.0, 0.62, 0.24], cool: [0.98, 0.18, 0.55],
-      liqTop: [0.16, 0.05, 0.11], liqBot: [0.09, 0.03, 0.07]
+      liqTop: [0.16, 0.05, 0.11], liqBot: [0.09, 0.03, 0.07],
+      colors: [
+        [1.0, 0.64, 0.26],  // tangerine
+        [1.0, 0.36, 0.36],  // coral
+        [0.98, 0.20, 0.56], // hot magenta
+        [1.0, 0.82, 0.32],  // gold
+        [1.0, 0.46, 0.22]   // burnt orange
+      ]
+    },
+    {
+      name: "Spectrum",
+      swatch: "conic-gradient(from 0deg,#ff3b3b,#ff9a1a,#ffe23a,#42d640,#2fb8ff,#6a5cff,#ff3bd0,#ff3b3b)",
+      glow: "#ffffff",
+      bgInner: "#0c0c1c", bgOuter: "#040409",
+      liqTop: [0.07, 0.07, 0.12], liqBot: [0.03, 0.03, 0.07],
+      colors: [
+        [1.0, 0.23, 0.23],  // red
+        [1.0, 0.60, 0.12],  // orange
+        [1.0, 0.88, 0.22],  // yellow
+        [0.26, 0.84, 0.25], // green
+        [0.18, 0.72, 1.0],  // sky
+        [0.42, 0.36, 1.0],  // indigo
+        [0.95, 0.24, 0.82]  // magenta
+      ]
     }
   ];
 
@@ -360,8 +407,7 @@
     uniform vec4  uBlobs[${MAX_BLOBS}];  // xy = center px (y up), z = radius px, w = temperature 0..1
     uniform int   uCount;
     uniform float uMaxHalf;      // px, half-width at widest point (x-normalization unit)
-    uniform vec3  uHot;
-    uniform vec3  uCool;
+    uniform vec3  uBlobCol[${MAX_BLOBS}]; // per-blob wax color
     uniform vec3  uLiqTop;
     uniform vec3  uLiqBot;
 
@@ -390,9 +436,12 @@
       if (inside <= 0.001) { discard; }
 
       // ---- metaball field ----
+      // each blob contributes its own color, weighted by how strongly it covers
+      // this pixel, so neighboring blobs blend their hues where they merge.
       float field = 0.0;
       float tempAcc = 0.0;
       float wAcc = 0.0;
+      vec3  colAcc = vec3(0.0);
       for (int i = 0; i < ${MAX_BLOBS}; i++) {
         if (i >= uCount) break;
         vec4 b = uBlobs[i];
@@ -401,9 +450,11 @@
         float c = (b.z * b.z) / dd;
         field += c;
         tempAcc += c * b.w;
+        colAcc += c * uBlobCol[i];
         wAcc += c;
       }
       float temp = wAcc > 0.0001 ? tempAcc / wAcc : 0.5;
+      vec3 waxCol = wAcc > 0.0001 ? colAcc / wAcc : uBlobCol[0];
 
       // ---- liquid background (vertical gradient + rim shading) ----
       vec3 liquid = mix(uLiqBot, uLiqTop, t);
@@ -415,14 +466,16 @@
       liquid += sheen * 0.06;
 
       // ---- wax surface ----
-      float surf = smoothstep(0.85, 1.35, field);          // coverage
-      float core = smoothstep(1.0, 3.2, field);            // dense interior
-      vec3 wax = mix(uCool, uHot, clamp(temp * 0.7 + core * 0.5, 0.0, 1.0));
+      // low threshold + wide feather => big blobs that reach toward each other and
+      // merge with stretchy necks instead of staying as separate circles.
+      float surf = smoothstep(0.55, 1.05, field);          // coverage
+      float core = smoothstep(1.0, 3.0, field);            // dense interior
+      vec3 wax = waxCol * (0.72 + 0.5 * core);             // denser interior reads brighter
       // inner luminosity: hotter, denser wax glows a touch
-      wax += uHot * core * 0.35 * temp;
+      wax += waxCol * core * 0.3 * temp;
       // rim light on the wax edge where it meets liquid
-      float edge = smoothstep(0.85, 1.05, field) * (1.0 - smoothstep(1.05, 1.6, field));
-      wax += vec3(1.0) * edge * 0.10;
+      float edge = smoothstep(0.55, 0.85, field) * (1.0 - smoothstep(0.85, 1.4, field));
+      wax += vec3(1.0) * edge * 0.09;
 
       vec3 col = mix(liquid, wax, surf);
 
@@ -464,8 +517,7 @@
     blobs: gl.getUniformLocation(prog, "uBlobs"),
     count: gl.getUniformLocation(prog, "uCount"),
     maxHalf: gl.getUniformLocation(prog, "uMaxHalf"),
-    hot: gl.getUniformLocation(prog, "uHot"),
-    cool: gl.getUniformLocation(prog, "uCool"),
+    blobCol: gl.getUniformLocation(prog, "uBlobCol"),
     liqTop: gl.getUniformLocation(prog, "uLiqTop"),
     liqBot: gl.getUniformLocation(prog, "uLiqBot"),
   };
@@ -493,14 +545,14 @@
   }
 
   function makeBlob(seed) {
-    const y = Math.random();
     return {
-      x: (Math.random() * 2 - 1) * 0.4,
-      y: y,
+      x: (Math.random() * 2 - 1) * 0.35,
+      y: Math.random(),
       vx: 0, vy: 0,
-      r: 0.20 + Math.random() * 0.16,   // normalized radius (unit = maxHalf)
+      r: 0.26 + Math.random() * 0.26,    // normalized radius (unit = maxHalf) — big, varied
       temp: 0.55 + Math.random() * 0.4,  // start warm so wax is already on the move
       wob: Math.random() * Math.PI * 2,  // wobble phase for organic horizontal drift
+      col: [1, 1, 1],                    // assigned from the active formula's palette
     };
   }
 
@@ -509,16 +561,16 @@
     blobs.length = 0;
     for (let i = 0; i < n; i++) blobs.push(makeBlob(i));
     // one fat, slow "mother" blob that mostly lives near the base
-    blobs[0].r = 0.34;
-    blobs[0].y = 0.10;
+    blobs[0].r = 0.55;
+    blobs[0].y = 0.14;
     blobs[0].temp = 1.0;
   }
-  seedBlobs(9);
+  seedBlobs(12);
 
   // physics constants
   const AMBIENT = 0.5;      // neutral-buoyancy temperature
-  const HEAT_ZONE = 0.24;   // lower fraction of the vessel that is heated
-  const COOL_ZONE = 0.74;   // above this fraction the wax sheds heat
+  const HEAT_ZONE = 0.30;   // lower fraction of the vessel that is heated
+  const COOL_ZONE = 0.72;   // above this fraction the wax sheds heat
   const HEAT_RATE = 2.0;    // per second near the base
   const COOL_RATE = 2.0;    // per second near the cap
   const DRIFT_COOL = 0.02;  // tiny ambient loss in transit — wax stays hot on the way up
@@ -565,8 +617,8 @@
       b.y += b.vy * dt;
 
       // vertical bounds — pool + reheat at the base, pool + cool at the cap
-      const loY = b.r * 0.42;
-      const hiY = 1.0 - b.r * 0.42;
+      const loY = b.r * 0.35;
+      const hiY = 1.0 - b.r * 0.35;
       if (b.y < loY) { b.y = loY; b.vy = Math.abs(b.vy) * 0.15; }
       if (b.y > hiY) { b.y = hiY; b.vy = -Math.abs(b.vy) * 0.15; }
 
@@ -579,6 +631,7 @@
 
   // ---------- render ----------
   const buf = new Float32Array(MAX_BLOBS * 4);
+  const colBuf = new Float32Array(MAX_BLOBS * 3);
 
   function render() {
     for (let i = 0; i < blobs.length; i++) {
@@ -587,8 +640,12 @@
       buf[i * 4 + 1] = b.y * H;                    // center y px (y up)
       buf[i * 4 + 2] = b.r * maxHalf;              // radius px
       buf[i * 4 + 3] = b.temp;
+      colBuf[i * 3 + 0] = b.col[0];
+      colBuf[i * 3 + 1] = b.col[1];
+      colBuf[i * 3 + 2] = b.col[2];
     }
     gl.uniform4fv(U.blobs, buf);
+    gl.uniform3fv(U.blobCol, colBuf);
     gl.uniform1i(U.count, blobs.length);
     gl.uniform2f(U.res, W, H);
     gl.uniform1f(U.maxHalf, maxHalf);
@@ -622,8 +679,12 @@
 
   // ---------- theme application ----------
   function applyFormula(f) {
-    gl.uniform3fv(U.hot, f.hot);
-    gl.uniform3fv(U.cool, f.cool);
+    // spread the palette across the blobs so several distinct hues are always
+    // visible; offset by hue index rather than blob index so neighbors differ.
+    const pal = f.colors;
+    for (let i = 0; i < blobs.length; i++) {
+      blobs[i].col = pal[(i * 2 + 1) % pal.length];
+    }
     gl.uniform3fv(U.liqTop, f.liqTop);
     gl.uniform3fv(U.liqBot, f.liqBot);
     const rs = document.documentElement.style;
