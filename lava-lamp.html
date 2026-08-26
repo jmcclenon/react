@@ -1,0 +1,687 @@
+<title>Aurora Lava</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" />
+
+<style>
+  :root {
+    /* Aurora formula — deep indigo liquid, hot-pink/violet wax, brass metal */
+    --bg-outer: #060411;
+    --bg-inner: #150a30;
+    --metal-1: #efe2c2;
+    --metal-2: #c9b083;
+    --metal-3: #8f7748;
+    --metal-edge: #5c4a2a;
+    --glow: #ffb347;
+    --ink: #efe7ff;
+    --ink-dim: #a99fce;
+    --hairline: rgba(233, 224, 255, 0.14);
+    --panel: rgba(18, 10, 38, 0.72);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background:
+      radial-gradient(120% 90% at 50% 42%, var(--bg-inner) 0%, var(--bg-outer) 62%, #000 100%);
+    color: var(--ink);
+    font-family: "Space Grotesk", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  }
+
+  #stage {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+  }
+
+  /* ------ the lamp ------ */
+  .lamp {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    filter: drop-shadow(0 40px 60px rgba(0, 0, 0, 0.55));
+  }
+
+  /* metal cap */
+  .cap {
+    position: relative;
+    z-index: 3;
+    height: 4.2vh;
+    border-radius: 7px 7px 3px 3px;
+    background:
+      linear-gradient(180deg, var(--metal-1) 0%, var(--metal-2) 46%, var(--metal-3) 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.65),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.35);
+    /* slight trapezoid: narrower at top */
+    clip-path: polygon(8% 0, 92% 0, 100% 100%, 0 100%);
+    margin-bottom: -2px;
+  }
+  .collar {
+    position: relative;
+    z-index: 3;
+    height: 1.5vh;
+    border-radius: 0 0 4px 4px;
+    background: linear-gradient(180deg, var(--metal-2), var(--metal-edge));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    margin-bottom: -1px;
+  }
+
+  /* the glass vessel holds the WebGL canvas */
+  .glass {
+    position: relative;
+    z-index: 2;
+    border-radius: 50% 50% 44% 44% / 8% 8% 6% 6%;
+    overflow: hidden;
+    /* faint glass body tint + rim so the vessel reads even before the lava warms */
+    background:
+      linear-gradient(90deg,
+        rgba(255,255,255,0.10) 0%,
+        rgba(255,255,255,0.02) 14%,
+        rgba(0,0,0,0.10) 55%,
+        rgba(0,0,0,0.20) 100%);
+    box-shadow:
+      inset 0 0 40px rgba(0, 0, 0, 0.45),
+      inset 0 2px 18px rgba(255, 255, 255, 0.06);
+  }
+  #lava { display: block; width: 100%; height: 100%; }
+
+  /* glass specular streak overlay */
+  .glass::after {
+    content: "";
+    position: absolute;
+    top: 3%;
+    left: 15%;
+    width: 12%;
+    height: 92%;
+    border-radius: 50%;
+    background: linear-gradient(180deg, rgba(255,255,255,0.5), rgba(255,255,255,0));
+    filter: blur(3px);
+    opacity: 0.35;
+    pointer-events: none;
+  }
+
+  /* metal base + heat glow */
+  .base-wrap {
+    position: relative;
+    z-index: 1;
+    margin-top: -2px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .base-glow {
+    position: absolute;
+    top: -30%;
+    width: 150%;
+    height: 90%;
+    background: radial-gradient(50% 60% at 50% 20%, var(--glow) 0%, rgba(255,140,60,0.35) 30%, transparent 70%);
+    filter: blur(10px);
+    opacity: 0.55;
+    pointer-events: none;
+    mix-blend-mode: screen;
+  }
+  .neck {
+    height: 1.6vh;
+    border-radius: 4px 4px 0 0;
+    background: linear-gradient(180deg, var(--metal-edge), var(--metal-3));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.25);
+  }
+  .base {
+    height: 12vh;
+    border-radius: 3px 3px 10px 10px;
+    /* brushed-metal fins */
+    background:
+      linear-gradient(180deg, var(--metal-1) 0%, var(--metal-2) 30%, var(--metal-3) 78%, var(--metal-edge) 100%),
+      repeating-linear-gradient(90deg,
+        rgba(0,0,0,0.16) 0 2px,
+        rgba(255,255,255,0.06) 2px 4px);
+    background-blend-mode: multiply;
+    /* trapezoid: wider at the bottom */
+    clip-path: polygon(14% 0, 86% 0, 100% 100%, 0 100%);
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,0.4),
+      inset 0 -6px 10px rgba(0,0,0,0.4),
+      0 14px 26px rgba(0,0,0,0.5);
+  }
+
+  /* ------ title ------ */
+  .brand {
+    position: fixed;
+    top: 26px;
+    left: 30px;
+    line-height: 1.15;
+    user-select: none;
+  }
+  .brand h1 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .brand span {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+  }
+
+  /* ------ controls ------ */
+  .controls {
+    position: fixed;
+    bottom: 22px;
+    left: 50%;
+    transform: translateX(-50%) translateY(6px);
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 11px 18px;
+    border-radius: 999px;
+    background: var(--panel);
+    border: 1px solid var(--hairline);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+    opacity: 0.14;
+    transition: opacity 0.5s ease, transform 0.5s ease;
+    z-index: 10;
+  }
+  .controls:hover,
+  .controls:focus-within,
+  body.nudge .controls {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .swatches { display: flex; gap: 9px; }
+  .swatch {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.28);
+    cursor: pointer;
+    padding: 0;
+    transition: transform 0.18s ease, border-color 0.18s ease;
+  }
+  .swatch:hover { transform: scale(1.12); }
+  .swatch[aria-pressed="true"] {
+    border-color: #fff;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
+  }
+  .swatch:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+
+  .sep { width: 1px; height: 24px; background: var(--hairline); }
+
+  .speed { display: flex; align-items: center; gap: 10px; }
+  .speed label {
+    font-size: 10.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+  }
+  .speed input {
+    width: 118px;
+    accent-color: var(--glow);
+    cursor: pointer;
+  }
+
+  .btn {
+    font-family: inherit;
+    font-size: 10.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid var(--hairline);
+    border-radius: 999px;
+    padding: 7px 13px;
+    cursor: pointer;
+    transition: background 0.18s ease, border-color 0.18s ease;
+  }
+  .btn:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255,255,255,0.3); }
+  .btn:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .controls { transition: none; }
+  }
+</style>
+
+<div id="stage">
+  <div class="lamp" id="lamp">
+    <div class="cap"></div>
+    <div class="collar"></div>
+    <div class="glass" id="glass">
+      <canvas id="lava"></canvas>
+    </div>
+    <div class="base-wrap">
+      <div class="base-glow"></div>
+      <div class="neck"></div>
+      <div class="base"></div>
+    </div>
+  </div>
+</div>
+
+<div class="brand">
+  <h1>Aurora Lava</h1>
+  <span>Ambient &middot; 1920 &times; 1080</span>
+</div>
+
+<div class="controls" id="controls">
+  <div class="swatches" id="swatches" role="group" aria-label="Lava formula"></div>
+  <div class="sep"></div>
+  <div class="speed">
+    <label for="speed">Flow</label>
+    <input id="speed" type="range" min="0" max="200" value="100" aria-label="Flow speed" />
+  </div>
+  <div class="sep"></div>
+  <button class="btn" id="fs">Fullscreen</button>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- formulas (palettes) ----------
+  // colors are linear-ish sRGB triples 0..1
+  const FORMULAS = [
+    {
+      name: "Aurora",
+      swatch: "linear-gradient(135deg,#ff3d7f,#7b2ff7)",
+      glow: "#ffb347",
+      bgInner: "#150a30", bgOuter: "#060411",
+      hot: [1.0, 0.24, 0.5], cool: [0.48, 0.18, 0.95],
+      liqTop: [0.09, 0.05, 0.22], liqBot: [0.05, 0.03, 0.13]
+    },
+    {
+      name: "Magma",
+      swatch: "linear-gradient(135deg,#ffcf3a,#ff2d1a)",
+      glow: "#ff7a1a",
+      bgInner: "#20080a", bgOuter: "#0a0302",
+      hot: [1.0, 0.82, 0.2], cool: [0.86, 0.12, 0.06],
+      liqTop: [0.16, 0.05, 0.03], liqBot: [0.09, 0.02, 0.02]
+    },
+    {
+      name: "Lagoon",
+      swatch: "linear-gradient(135deg,#3df0d0,#2f7bf7)",
+      glow: "#39d8ff",
+      bgInner: "#04202a", bgOuter: "#02090f",
+      hot: [0.24, 0.95, 0.82], cool: [0.16, 0.45, 0.95],
+      liqTop: [0.03, 0.12, 0.16], liqBot: [0.02, 0.06, 0.1]
+    },
+    {
+      name: "Toxic",
+      swatch: "linear-gradient(135deg,#c6ff3a,#20c05a)",
+      glow: "#9dff2a",
+      bgInner: "#0d2007", bgOuter: "#030a02",
+      hot: [0.78, 1.0, 0.22], cool: [0.13, 0.72, 0.36],
+      liqTop: [0.06, 0.14, 0.05], liqBot: [0.03, 0.08, 0.03]
+    },
+    {
+      name: "Sunset",
+      swatch: "linear-gradient(135deg,#ff9a3d,#ff2f8e)",
+      glow: "#ff9a3d",
+      bgInner: "#22091b", bgOuter: "#0a0206",
+      hot: [1.0, 0.62, 0.24], cool: [0.98, 0.18, 0.55],
+      liqTop: [0.16, 0.05, 0.11], liqBot: [0.09, 0.03, 0.07]
+    }
+  ];
+
+  const MAX_BLOBS = 14;
+
+  // ---------- webgl setup ----------
+  const canvas = document.getElementById("lava");
+  const gl = canvas.getContext("webgl", { premultipliedAlpha: false, antialias: false, alpha: true });
+
+  if (!gl) {
+    document.getElementById("glass").innerHTML =
+      '<div style="display:grid;place-items:center;height:100%;color:#a99fce;font:14px sans-serif;padding:20px;text-align:center">WebGL is required for the lava animation.</div>';
+    return;
+  }
+
+  const VERT = `
+    attribute vec2 aPos;
+    void main() { gl_Position = vec4(aPos, 0.0, 1.0); }
+  `;
+
+  const FRAG = `
+    precision highp float;
+
+    uniform vec2  uRes;          // canvas pixel size
+    uniform vec4  uBlobs[${MAX_BLOBS}];  // xy = center px (y up), z = radius px, w = temperature 0..1
+    uniform int   uCount;
+    uniform float uMaxHalf;      // px, half-width at widest point (x-normalization unit)
+    uniform vec3  uHot;
+    uniform vec3  uCool;
+    uniform vec3  uLiqTop;
+    uniform vec3  uLiqBot;
+
+    // vessel half-width profile in normalized units (0..~1), t = 0 bottom .. 1 top
+    float halfWidth(float t) {
+      // tapered lava-lamp silhouette: wide low body, narrow neck, tiny bulge
+      float base = mix(0.98, 0.30, pow(t, 0.82));
+      float bulge = 0.06 * exp(-pow((t - 0.30) * 3.4, 2.0));
+      float w = base + bulge;
+      // round off the very bottom and the shoulder near the top
+      w *= smoothstep(0.0, 0.04, t);
+      w *= smoothstep(1.0, 0.9, t) * 0.6 + 0.4;
+      return w;
+    }
+
+    void main() {
+      vec2 p = gl_FragCoord.xy;                 // px, y up
+      float t = clamp(p.y / uRes.y, 0.0, 1.0);  // 0 bottom .. 1 top
+      float xN = (p.x - uRes.x * 0.5) / uMaxHalf; // normalized x, 0 = center
+
+      float hw = halfWidth(t);                  // allowed half-width (normalized)
+      // soft vessel mask (feather in px)
+      float edgePx = uMaxHalf * 0.012 + 1.0;
+      float distToWall = (hw - abs(xN)) * uMaxHalf; // px inside wall (positive = inside)
+      float inside = smoothstep(0.0, edgePx, distToWall);
+      if (inside <= 0.001) { discard; }
+
+      // ---- metaball field ----
+      float field = 0.0;
+      float tempAcc = 0.0;
+      float wAcc = 0.0;
+      for (int i = 0; i < ${MAX_BLOBS}; i++) {
+        if (i >= uCount) break;
+        vec4 b = uBlobs[i];
+        vec2 d = p - b.xy;
+        float dd = dot(d, d) + 1.0;
+        float c = (b.z * b.z) / dd;
+        field += c;
+        tempAcc += c * b.w;
+        wAcc += c;
+      }
+      float temp = wAcc > 0.0001 ? tempAcc / wAcc : 0.5;
+
+      // ---- liquid background (vertical gradient + rim shading) ----
+      vec3 liquid = mix(uLiqBot, uLiqTop, t);
+      // darken toward the glass walls
+      float rim = smoothstep(0.0, 0.55, distToWall / uMaxHalf);
+      liquid *= mix(0.55, 1.0, rim);
+      // left specular sheen inside the glass
+      float sheen = smoothstep(0.16, 0.02, abs(xN + hw * 0.55));
+      liquid += sheen * 0.06;
+
+      // ---- wax surface ----
+      float surf = smoothstep(0.85, 1.35, field);          // coverage
+      float core = smoothstep(1.0, 3.2, field);            // dense interior
+      vec3 wax = mix(uCool, uHot, clamp(temp * 0.7 + core * 0.5, 0.0, 1.0));
+      // inner luminosity: hotter, denser wax glows a touch
+      wax += uHot * core * 0.35 * temp;
+      // rim light on the wax edge where it meets liquid
+      float edge = smoothstep(0.85, 1.05, field) * (1.0 - smoothstep(1.05, 1.6, field));
+      wax += vec3(1.0) * edge * 0.10;
+
+      vec3 col = mix(liquid, wax, surf);
+
+      // subtle global vignette inside vessel
+      col *= mix(0.9, 1.06, rim);
+
+      gl_FragColor = vec4(col, inside);
+    }
+  `;
+
+  function compile(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      throw new Error(gl.getShaderInfoLog(s) || "shader compile failed");
+    }
+    return s;
+  }
+
+  const prog = gl.createProgram();
+  gl.attachShader(prog, compile(gl.VERTEX_SHADER, VERT));
+  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FRAG));
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+    throw new Error(gl.getProgramInfoLog(prog) || "program link failed");
+  }
+  gl.useProgram(prog);
+
+  const quad = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+  const aPos = gl.getAttribLocation(prog, "aPos");
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+  const U = {
+    res: gl.getUniformLocation(prog, "uRes"),
+    blobs: gl.getUniformLocation(prog, "uBlobs"),
+    count: gl.getUniformLocation(prog, "uCount"),
+    maxHalf: gl.getUniformLocation(prog, "uMaxHalf"),
+    hot: gl.getUniformLocation(prog, "uHot"),
+    cool: gl.getUniformLocation(prog, "uCool"),
+    liqTop: gl.getUniformLocation(prog, "uLiqTop"),
+    liqBot: gl.getUniformLocation(prog, "uLiqBot"),
+  };
+
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+  // ---------- simulation ----------
+  // blob state in normalized lamp space: x in [-1,1] (1 == maxHalf), y in [0,1]
+  let W = 10, H = 10, maxHalf = 100;
+
+  function profileHalf(t) {
+    // JS mirror of the shader's halfWidth (for constraining blobs)
+    const base = mixf(0.98, 0.30, Math.pow(clamp(t, 0, 1), 0.82));
+    const bulge = 0.06 * Math.exp(-Math.pow((t - 0.30) * 3.4, 2));
+    let w = base + bulge;
+    w *= smoothstep(0.0, 0.04, t);
+    return Math.max(0.05, w);
+  }
+  function mixf(a, b, u) { return a + (b - a) * u; }
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  function smoothstep(e0, e1, x) {
+    const u = clamp((x - e0) / (e1 - e0), 0, 1);
+    return u * u * (3 - 2 * u);
+  }
+
+  function makeBlob(seed) {
+    const y = Math.random();
+    return {
+      x: (Math.random() * 2 - 1) * 0.4,
+      y: y,
+      vx: 0, vy: 0,
+      r: 0.20 + Math.random() * 0.16,   // normalized radius (unit = maxHalf)
+      temp: 0.3 + Math.random() * 0.4,
+      wob: Math.random() * Math.PI * 2,  // wobble phase for organic horizontal drift
+    };
+  }
+
+  const blobs = [];
+  function seedBlobs(n) {
+    blobs.length = 0;
+    for (let i = 0; i < n; i++) blobs.push(makeBlob(i));
+    // one fat, slow "mother" blob that mostly lives near the base
+    blobs[0].r = 0.34;
+    blobs[0].y = 0.08;
+    blobs[0].temp = 0.9;
+  }
+  seedBlobs(9);
+
+  // physics constants
+  const AMBIENT = 0.5;
+  const HEAT_RATE = 0.9;    // per second near base
+  const COOL_RATE = 0.7;    // per second near cap
+  const DRIFT_COOL = 0.06;  // ambient cooling everywhere
+  const BUOY = 0.9;         // buoyancy strength
+  const DAMP = 0.86;        // velocity damping per step
+
+  let speed = 1.0;          // user flow multiplier
+
+  function step(dt) {
+    dt = Math.min(dt, 0.05) * speed;
+    if (dt <= 0) return;
+
+    for (const b of blobs) {
+      const hw = profileHalf(b.y);
+
+      // heat exchange
+      if (b.y < 0.14) {
+        b.temp += HEAT_RATE * dt * (1.0 - b.temp);       // warm at the base
+      } else if (b.y > 0.84) {
+        b.temp -= COOL_RATE * dt * b.temp;               // cool at the cap
+      }
+      b.temp -= DRIFT_COOL * dt;                          // gentle ambient loss
+      b.temp = clamp(b.temp, 0.0, 1.0);
+
+      // buoyancy from temperature difference; bigger blobs are more sluggish
+      const buoy = (b.temp - AMBIENT) * BUOY / (0.55 + b.r);
+      b.vy += buoy * dt;
+
+      // organic horizontal wander + gentle pull to center
+      b.wob += dt * (0.5 + b.r);
+      b.vx += (Math.sin(b.wob) * 0.05 - b.x * 0.35) * dt;
+
+      // damping
+      const d = Math.pow(DAMP, dt * 60);
+      b.vx *= d;
+      b.vy *= d;
+
+      // integrate
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+
+      // vertical bounds — reheats at bottom, cools + pools at top
+      const rB = b.r * 0.9;
+      if (b.y < rB * 0.5) { b.y = rB * 0.5; b.vy = Math.abs(b.vy) * 0.2; }
+      if (b.y > 1.0 - rB * 0.5) { b.y = 1.0 - rB * 0.5; b.vy = -Math.abs(b.vy) * 0.2; }
+
+      // horizontal bounds — keep the blob body within the glass wall
+      const limit = Math.max(0.0, hw - b.r * 0.45);
+      if (b.x > limit) { b.x = limit; b.vx = -Math.abs(b.vx) * 0.4; }
+      if (b.x < -limit) { b.x = -limit; b.vx = Math.abs(b.vx) * 0.4; }
+    }
+  }
+
+  // ---------- render ----------
+  const buf = new Float32Array(MAX_BLOBS * 4);
+
+  function render() {
+    for (let i = 0; i < blobs.length; i++) {
+      const b = blobs[i];
+      buf[i * 4 + 0] = W * 0.5 + b.x * maxHalf;   // center x px
+      buf[i * 4 + 1] = b.y * H;                    // center y px (y up)
+      buf[i * 4 + 2] = b.r * maxHalf;              // radius px
+      buf[i * 4 + 3] = b.temp;
+    }
+    gl.uniform4fv(U.blobs, buf);
+    gl.uniform1i(U.count, blobs.length);
+    gl.uniform2f(U.res, W, H);
+    gl.uniform1f(U.maxHalf, maxHalf);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  // ---------- sizing ----------
+  const glassEl = document.getElementById("glass");
+
+  function layout() {
+    // vessel height ~ 76% of viewport height, classic tall aspect (~1 : 3.1)
+    const vh = window.innerHeight;
+    const gH = Math.round(vh * 0.76);
+    const gW = Math.round(gH * 0.33);
+    glassEl.style.height = gH + "px";
+    glassEl.style.width = gW + "px";
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = Math.round(gW * dpr);
+    H = Math.round(gH * dpr);
+    canvas.width = W;
+    canvas.height = H;
+    maxHalf = W * 0.5;   // widest silhouette point spans the full canvas width
+    gl.viewport(0, 0, W, H);
+  }
+
+  window.addEventListener("resize", layout);
+  layout();
+
+  // ---------- theme application ----------
+  function applyFormula(f) {
+    gl.uniform3fv(U.hot, f.hot);
+    gl.uniform3fv(U.cool, f.cool);
+    gl.uniform3fv(U.liqTop, f.liqTop);
+    gl.uniform3fv(U.liqBot, f.liqBot);
+    const rs = document.documentElement.style;
+    rs.setProperty("--glow", f.glow);
+    rs.setProperty("--bg-inner", f.bgInner);
+    rs.setProperty("--bg-outer", f.bgOuter);
+  }
+
+  // ---------- controls ----------
+  const swatchWrap = document.getElementById("swatches");
+  let current = 0;
+  FORMULAS.forEach((f, i) => {
+    const b = document.createElement("button");
+    b.className = "swatch";
+    b.style.background = f.swatch;
+    b.title = f.name;
+    b.setAttribute("aria-label", f.name);
+    b.setAttribute("aria-pressed", i === 0 ? "true" : "false");
+    b.addEventListener("click", () => {
+      current = i;
+      applyFormula(f);
+      [...swatchWrap.children].forEach((c, j) =>
+        c.setAttribute("aria-pressed", j === i ? "true" : "false"));
+    });
+    swatchWrap.appendChild(b);
+  });
+  applyFormula(FORMULAS[0]);
+
+  const speedEl = document.getElementById("speed");
+  speedEl.addEventListener("input", () => {
+    speed = (+speedEl.value) / 100;
+  });
+
+  const fsBtn = document.getElementById("fs");
+  fsBtn.addEventListener("click", () => {
+    if (!document.fullscreenElement) {
+      (document.documentElement.requestFullscreen || (()=>{})).call(document.documentElement);
+    } else {
+      document.exitFullscreen && document.exitFullscreen();
+    }
+  });
+
+  // reveal controls briefly on load so they're discoverable, then let them fade
+  document.body.classList.add("nudge");
+  setTimeout(() => document.body.classList.remove("nudge"), 2600);
+
+  // ---------- main loop ----------
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduce) speed = 0.35;
+
+  let last = performance.now();
+  let running = true;
+  document.addEventListener("visibilitychange", () => {
+    running = !document.hidden;
+    if (running) { last = performance.now(); requestAnimationFrame(loop); }
+  });
+
+  function loop(now) {
+    if (!running) return;
+    const dt = (now - last) / 1000;
+    last = now;
+    step(dt);
+    render();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
