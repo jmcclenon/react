@@ -468,8 +468,8 @@
       // ---- wax surface ----
       // higher threshold + tight feather => distinct rounded blobs that only fuse
       // when they actually touch, with clear liquid between them.
-      float surf = smoothstep(0.95, 1.18, field);          // sharp-ish blob edge
-      float dens = smoothstep(1.0, 2.4, field);            // 0 at rim .. 1 deep inside
+      float surf = smoothstep(0.78, 1.30, field);          // soft, gauzy blob edge
+      float dens = smoothstep(0.9, 2.4, field);            // 0 at rim .. 1 deep inside
 
       // opaque, backlit wax — solid color with soft internal volume shading,
       // NOT an emissive glow. Rim reads darker, center a touch fuller.
@@ -549,9 +549,16 @@
       x: (Math.random() * 2 - 1) * 0.35,
       y: Math.random(),
       vx: 0, vy: 0,
-      r: 0.18 + Math.random() * 0.16,    // normalized radius (unit = maxHalf) — distinct blobs
-      temp: 0.55 + Math.random() * 0.4,  // start warm so wax is already on the move
-      wob: Math.random() * Math.PI * 2,  // wobble phase for organic horizontal drift
+      r: 0.15 + Math.random() * 0.22,    // normalized radius (unit = maxHalf) — wide size spread
+      temp: 0.4 + Math.random() * 0.55,  // start at mixed temperatures
+      // per-blob character so no two move alike
+      wob: Math.random() * Math.PI * 2,  // drift phase
+      wobF: 0.30 + Math.random() * 0.85, // drift frequency
+      wobF2: 0.18 + Math.random() * 0.5, // secondary drift frequency (breaks up the sine)
+      wobP: Math.random() * Math.PI * 2, // secondary drift phase
+      wobA: 0.045 + Math.random() * 0.11, // drift amplitude
+      buoyScale: 0.80 + Math.random() * 0.40, // personal density -> rises/sinks at its own rate
+      heatScale: 0.75 + Math.random() * 0.50, // personal heat response -> desynced cycle
       col: [1, 1, 1],                    // assigned from the active formula's palette
     };
   }
@@ -574,7 +581,7 @@
   const HEAT_RATE = 2.0;    // per second near the base
   const COOL_RATE = 2.0;    // per second near the cap
   const DRIFT_COOL = 0.02;  // tiny ambient loss in transit — wax stays hot on the way up
-  const BUOY = 2.6;         // buoyancy strength
+  const BUOY = 1.5;         // buoyancy strength (lower = slower, lazier flow)
   const DAMP_K = 4.0;       // continuous velocity damping rate (1/s)
 
   let speed = 1.0;          // user flow multiplier
@@ -590,23 +597,27 @@
 
       // heat exchange with the lamp: warm low, cool high, hold heat in between so a
       // blob reaches the cap still buoyant, then sinks once cooled — a closed cycle.
+      // heatScale varies per blob so the population never rises and falls in unison.
       if (b.y < HEAT_ZONE) {
         const near = 1.0 - b.y / HEAT_ZONE;              // strongest at the very base
-        b.temp += HEAT_RATE * near * dt * (1.05 - b.temp);
+        b.temp += HEAT_RATE * b.heatScale * near * dt * (1.05 - b.temp);
       } else if (b.y > COOL_ZONE) {
         const near = (b.y - COOL_ZONE) / (1.0 - COOL_ZONE);
-        b.temp -= COOL_RATE * near * dt * (b.temp + 0.05);
+        b.temp -= COOL_RATE * b.heatScale * near * dt * (b.temp + 0.05);
       }
       b.temp -= DRIFT_COOL * dt;                          // faint ambient loss in transit
       b.temp = clamp(b.temp, 0.0, 1.0);
 
-      // buoyancy from temperature difference; bigger blobs are a little more sluggish
-      const buoy = (b.temp - AMBIENT) * BUOY / (0.6 + b.r);
+      // buoyancy from temperature difference; personal density + size vary the rate
+      const buoy = (b.temp - AMBIENT) * BUOY * b.buoyScale / (0.6 + b.r);
       b.vy += buoy * dt;
 
-      // organic horizontal wander + a soft pull back toward center
-      b.wob += dt * (0.6 + b.r);
-      b.vx += (Math.sin(b.wob) * 0.09 - b.x * 0.22) * dt;
+      // wandering horizontal drift: two out-of-phase sines make a non-repeating,
+      // per-blob path, plus a soft pull back toward center so nothing sticks to a wall.
+      b.wob += dt * b.wobF;
+      const drift = Math.sin(b.wob) * b.wobA
+                  + Math.sin(b.wob * b.wobF2 + b.wobP) * b.wobA * 0.7;
+      b.vx += (drift - b.x * 0.16) * dt;
 
       // damping (frame-rate independent)
       b.vx *= damp;
